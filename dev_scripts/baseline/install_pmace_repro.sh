@@ -25,6 +25,8 @@ pip install "numpy==1.26.4" "scipy==1.10.1" "pandas==2.2.*" "tifffile==2024.*" \
             imagecodecs "h5py==3.11.*" "pyfftw==0.14.0" "matplotlib==3.8.*" \
             "pyyaml==6.*" tqdm
 pip install "bm4d==4.2.5" || echo "bm4d did not install; the capture scripts use the stub"
+# bm4d pulls a new scipy; pin scipy back so scipy.signal.tukey still exists.
+pip install --no-deps "scipy==1.10.1"
 pip install --no-deps -e "$PMACE_DIR"
 
 # The old module imports bm4d at import time.  When bm4d is absent or

@@ -1,7 +1,7 @@
 """Baseline B5: a tiny noiseless PMACE run of the OLD code, every iterate saved.
 
 A 64 x 64 complex object and a 16 x 16 probe built from fixed formulas,
-25 scan positions on a 5 x 5 grid at 12 pixel spacing, no noise, known
+49 scan positions on a 7 x 7 grid at 8 pixel spacing, no noise, known
 probe.  pmace_recon is called once per iteration count from 1 to 20;
 the loop has no randomness, so each call gives the exact iterate at
 that index.  The run writes every iterate, the error curves, and a JSON
@@ -24,8 +24,8 @@ from baseline_common import (import_pmace, make_run_dir, save_inputs, write_para
 # ------------------------------- Parameters -------------------------------
 OBJECT_SIZE = 64
 PROBE_SIZE = 16
-GRID = 5
-SPACING = 12
+GRID = 7
+SPACING = 8
 ITERATIONS = 20
 OBJ_DATA_FIT = 0.5          # the old code's default alpha
 RHO = 0.5
@@ -47,7 +47,7 @@ def make_object(n):
 def make_probe(m):
     """A Gaussian amplitude with a quadratic phase, a focused beam."""
     y, x = np.mgrid[0:m, 0:m] - (m - 1) / 2
-    r2 = (x ** 2 + y ** 2) / (0.18 * m) ** 2
+    r2 = (x ** 2 + y ** 2) / (0.32 * m) ** 2
     return (np.exp(-r2) * np.exp(1j * 0.6 * r2)).astype(np.complex64)
 
 
