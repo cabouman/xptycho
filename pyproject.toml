@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "xptycho"
+description = "Ptychographic reconstruction with PMACE in PyTorch"
+readme = "README.md"
+license = { text = "BSD-3-Clause" }
+requires-python = ">=3.11"
+dynamic = ["version"]
+authors = [
+    { name = "Charles A. Bouman" },
+]
+dependencies = [
+    "numpy",
+    "scipy",
+    "torch>=2.2",
+    "h5py",
+    "tifffile",
+    "matplotlib",
+]
+
+[project.optional-dependencies]
+test = ["pytest"]
+docs = ["sphinx", "sphinx_book_theme", "sphinx-copybutton", "sphinxext-opengraph"]
+
+[project.urls]
+Homepage = "https://github.com/cabouman/xptycho"
+Documentation = "https://xptycho.readthedocs.io"
+
+[tool.setuptools]
+packages = ["xptycho"]
+
+[tool.setuptools.dynamic]
+version = { attr = "xptycho.__version__" }

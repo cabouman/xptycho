@@ -1,0 +1,6 @@
+numpy
+scipy
+torch>=2.2
+h5py
+tifffile
+matplotlib

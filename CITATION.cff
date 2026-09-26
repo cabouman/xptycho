@@ -1,0 +1,52 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite the papers below."
+title: "xptycho: Ptychographic reconstruction with PMACE in PyTorch"
+type: software
+authors:
+  - family-names: Bouman
+    given-names: Charles A.
+version: 0.0.1
+date-released: 2026-09-26
+url: "https://xptycho.readthedocs.io"
+repository-code: "https://github.com/cabouman/xptycho"
+license: BSD-3-Clause
+preferred-citation:
+  type: article
+  title: "Projected Multi-Agent Consensus Equilibrium (PMACE) with application to ptychography"
+  authors:
+    - family-names: Zhai
+      given-names: Qiuchen
+    - family-names: Buzzard
+      given-names: Gregery T.
+    - family-names: Mertes
+      given-names: Kevin
+    - family-names: Wohlberg
+      given-names: Brendt
+    - family-names: Bouman
+      given-names: Charles A.
+  journal: "IEEE Transactions on Computational Imaging"
+  volume: 9
+  start: 1058
+  end: 1070
+  year: 2023
+  doi: "10.1109/TCI.2023.3328288"
+references:
+  - type: article
+    title: "Ptychography using blind multi-mode PMACE"
+    authors:
+      - family-names: Zhai
+        given-names: Qiuchen
+      - family-names: Buzzard
+        given-names: Gregery T.
+      - family-names: Mertes
+        given-names: Kevin
+      - family-names: Wohlberg
+        given-names: Brendt
+      - family-names: Bouman
+        given-names: Charles A.
+    journal: "IEEE Transactions on Computational Imaging"
+    volume: 11
+    start: 1320
+    end: 1335
+    year: 2025
+    doi: "10.1109/TCI.2025.3609957"
