@@ -4,28 +4,34 @@
 User API
 ========
 
-A reconstruction is three steps, and the API has one part for each:
+xptycho is organized around one idea.  A :class:`~xptycho.PtychographyModel`
+is the forward map from an object image to the amplitudes measured at
+the scan positions.  An algorithm such as :class:`~xptycho.PMACE` is a
+way to invert that map.  One loop streams the scan positions through
+whichever pair you chose.  Everything physical is a model parameter or
+a model subclass; everything numerical is an algorithm.
 
-1. **Load or simulate** the scan into a :class:`~xptycho.Scan`
+A reconstruction is three steps:
+
+1. **Load or simulate** the measurement into a :class:`~xptycho.Scan`
    (:ref:`ScanDocs`).  Measured data goes through
    :func:`~xptycho.preprocess` first.
-2. **Reconstruct** with :func:`~xptycho.pmace` (:ref:`PmaceDocs`).
+2. **Build the model** from the scan's geometry and what is known about
+   the probe, and **reconstruct** with its
+   :meth:`~xptycho.PtychographyModel.recon` method (:ref:`ModelDocs`).
 3. **Review** the returned :class:`~xptycho.Reconstruction`
    (:ref:`ReconstructionDocs`).
 
-In outline, every reconstruction script looks like this:
-
 .. code-block:: python
 
-    # 1. Load, or simulate.
     scan = xptycho.Scan.open('scan.h5')
 
-    # 2. Reconstruct.  The probe is known and held fixed, or estimated.
-    recon = xptycho.pmace(scan, probe=known_probe, iterations=100)
-    recon = xptycho.pmace(scan, fit_probe=True, probe_modes=2,
-                          add_mode_at=20, iterations=200)
+    model = xptycho.FarFieldModel.from_scan(scan, probe=known_probe)
+    recon = model.recon(scan, method='pmace', iterations=100)
 
-    # 3. Review.
+    model = xptycho.FarFieldModel.from_scan(scan, estimate_probe=True, probe_modes=2)
+    recon = model.recon(scan, method='pmace', iterations=200, add_mode_iterations=[20])
+
     print(recon.summary())
     recon.show(OUTPUT_DIR)
     recon.save(OUTPUT_DIR)
@@ -37,61 +43,82 @@ The script above does not change when the scan is too large for
 memory.  A :class:`~xptycho.Scan` opened from a file keeps its frames
 in the file and reads them in batches through
 :meth:`~xptycho.Scan.batches`, the only path from storage into a
-reconstruction.  The PMACE iteration accumulates its consensus sums
-across the batches and divides once per iteration, so the result does
-not depend on the batch size.  The per-position state of the
-iteration, which is larger than the frames, is kept on the GPU, in
-host memory, or in a file in the output folder, whichever fits, and
-the choice is printed.  On a node with several GPUs the positions are
-split across them.  All of these are machine settings: they never
-change the answer, they are chosen automatically, and
-:class:`~xptycho.Machine` overrides them.
+reconstruction.  The loop accumulates the algorithm's sums across the
+batches and reduces them once per pass, so the result does not depend
+on the batch size.  The per-position state of the iteration, which is
+larger than the frames, is kept on the GPU, in host memory, or in a
+file, whichever fits, and the choice is printed.  On a node with
+several GPUs the positions are split across them by
+:meth:`~xptycho.PtychographyModel.configure_devices`, and one process
+drives them all.  A run given a checkpoint directory writes
+checkpoints on an interval and resumes from them when the same script
+runs again.  See :ref:`LoopDocs` for the loop and the state.
+
+.. _ModelDocs:
+
+The model
+---------
+
+.. autoclass:: xptycho.PtychographyModel
+   :members:
+
+.. autoclass:: xptycho.FarFieldModel
+   :members:
 
 .. _ScanDocs:
 
-Scan
-----
+The scan
+--------
 
 .. autoclass:: xptycho.Scan
    :members:
 
-.. autoclass:: xptycho.FrameSource
+.. autoclass:: xptycho.FrameStore
    :members:
 
 .. autofunction:: xptycho.preprocess
 
-.. _PmaceDocs:
-
-Reconstruction functions
-------------------------
-
-.. autofunction:: xptycho.pmace
-
-.. autoclass:: xptycho.Machine
-   :members:
-
-.. autofunction:: xptycho.refine_positions
-
 .. _ReconstructionDocs:
 
-Reconstruction
---------------
+The reconstruction
+------------------
 
 .. autoclass:: xptycho.Reconstruction
    :members:
 
 .. autofunction:: xptycho.nrmse
 
+Algorithms
+----------
+
+.. autoclass:: xptycho.PMACE
+   :members:
+
+.. autofunction:: xptycho.refine_positions
+
+.. _LoopDocs:
+
+The loop and the state
+----------------------
+
+For full control of a run, or to write a new algorithm.
+
+.. autoclass:: xptycho.ReconLoop
+   :members:
+
+.. autoclass:: xptycho.StateArray
+   :members:
+
+.. autoclass:: xptycho.Batch
+
 Simulation and ground truth
 ---------------------------
 
 .. autoclass:: xptycho.GroundTruth
 
+.. autofunction:: xptycho.scan_positions
+
 .. autofunction:: xptycho.simulate_scan
-
-.. autofunction:: xptycho.initial_probe
-
-.. autofunction:: xptycho.initial_object
 
 Data
 ----
@@ -105,8 +132,8 @@ Data
 Operators
 ---------
 
-The building blocks of the algorithms, public so that a new algorithm
-can be written from them.
+The kernels the model is built from, public so that a new model or
+algorithm can be written from them.
 
 .. automodule:: xptycho.operators
    :members:

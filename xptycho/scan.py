@@ -1,59 +1,41 @@
-"""The Scan: the measurement, the instrument facts, and the object grid."""
-
-import numpy as np
+"""The Scan: the measurement as the instrument recorded it."""
 
 
 class Scan:
-    """A ptychographic scan: the diffraction frames, the scan positions,
-    the instrument facts, and the object grid they imply.
+    """A ptychographic measurement: the diffraction frames, the recorded
+    scan positions, the corrections, and the instrument facts.
 
-    A ``Scan`` is the input to every reconstruction.  Its frames are
-    detector counts, one frame per scan position.  They are held in
-    memory when the scan is small and read from a file in batches when
-    it is not; the reconstruction sees no difference, because it takes
-    the frames only through :meth:`batches`.  Dark subtraction, the
-    validity mask, the apodization window, and the square root are
-    applied to each batch as it is read, so the stored frames stay raw.
+    A ``Scan`` holds what was measured and nothing that is chosen.  The
+    object grid, the positions used, and the probe belong to the
+    :class:`~xptycho.PtychographyModel`.  Frames are detector counts,
+    one per position.  They are held in memory when the scan is small
+    and read from a file in batches when it is not; a reconstruction
+    takes them only through :meth:`batches`, so it sees no difference.
+    Dark subtraction, the validity mask, the apodization window, and
+    the square root are applied to each batch as it is read, so the
+    stored frames stay raw.
 
-    The object grid, the pixel array the reconstruction is computed on,
-    is derived from the positions and the frame size with a margin so
-    that every patch lies inside it.  The object pixel size is derived
-    from the physics: ``wavelength * detector_distance / (frame_size *
-    detector_pixel)``, the far-field relation.  When the geometry is not
-    given, positions must be declared in pixels and the pixel size is
-    reported as not known.
-
-    A ``Scan`` is never modified by a reconstruction.  Refined positions
-    come back in the result, not in the scan.
+    A ``Scan`` is never modified by a reconstruction.
 
     Args:
-        frames (ndarray or FrameSource): detector counts, shape
+        frames (ndarray or FrameStore): detector counts, shape
             ``(num_frames, height, width)``.  An array holds the frames
-            in memory; a :class:`FrameSource` reads them from a file in
-            batches.
-        positions (ndarray): shape ``(num_frames, 2)``, row then column,
-            in metres unless ``position_units='pixel'``.
+            in memory; a :class:`FrameStore` reads them from a file.
+        positions (ndarray): ``(num_frames, 2)``, row then column, in
+            metres unless ``position_units='pixel'``.
         wavelength (float, optional): metres.  Give this or ``energy``.
-        energy (float, optional): photon energy in keV, converted to the
-            wavelength.
-        detector_distance (float, optional): metres, sample to detector.
-        detector_pixel (float, optional): metres, the detector pixel pitch
-            after any binning.
+        energy (float, optional): keV.
+        detector_distance (float, optional): metres.
+        detector_pixel (float, optional): metres, after any binning.
         detector_center (tuple of float, optional): ``(row, col)`` of the
-            beam center on the detector, in pixels.  Defaults to the
-            frame center.
+            beam center in detector pixels.
         dark (ndarray, optional): the dark frame in counts, subtracted
             from every frame as it is read.
-        mask (ndarray, optional): ``(height, width)`` of bool, True where
-            the detector pixel is valid.  Invalid pixels take no part in
-            the data fit.
+        mask (ndarray, optional): ``(height, width)`` bool, True where
+            the detector pixel is valid.
         apodization (ndarray, optional): ``(height, width)`` weight
-            multiplied into every frame's amplitude, as the gold-ball
-            experiments of the papers do with a Tukey window.
+            multiplied into every frame's amplitude.
         position_units (str, optional): ``'m'`` (default) or ``'pixel'``.
-            Pixels are allowed only when the geometry is not given.
-        margin (int, optional): pixels of object grid added beyond the
-            outermost patch on every side.  Defaults to 0.
         name (str, optional): a label for summaries and saved files.
 
     Example:
@@ -66,11 +48,9 @@ class Scan:
 
     def __init__(self, frames, positions, *, wavelength=None, energy=None,
                  detector_distance=None, detector_pixel=None, detector_center=None,
-                 dark=None, mask=None, apodization=None, position_units='m',
-                 margin=0, name=None):
+                 dark=None, mask=None, apodization=None, position_units='m', name=None):
         raise NotImplementedError
 
-    # ---------------------------------------------------------------- sizes
     @property
     def num_frames(self):
         """The number of scan positions."""
@@ -83,93 +63,49 @@ class Scan:
 
     @property
     def positions(self):
-        """``(num_frames, 2)`` float64, row then column, in metres, or in
-        pixels when the scan was declared in pixels."""
+        """``(num_frames, 2)`` float64, row then column, as recorded."""
         raise NotImplementedError
 
-    @property
-    def pixel_size(self):
-        """The object pixel size in metres, or None when the geometry was
-        not given."""
-        raise NotImplementedError
-
-    @property
-    def object_shape(self):
-        """``(rows, cols)`` of the object grid: the smallest grid that
-        holds every patch, plus the margin."""
-        raise NotImplementedError
-
-    @property
-    def origin(self):
-        """``(row, col)`` of the object grid's first pixel in metres, in
-        the coordinates of the positions."""
-        raise NotImplementedError
-
-    @property
-    def overlap(self):
-        """The mean overlap fraction between neighboring probe positions,
-        as the papers define it, computed from the positions and the
-        frame size (the probe is taken to fill the frame)."""
-        raise NotImplementedError
-
-    # -------------------------------------------------------------- reading
     def batches(self, batch_size, device=None):
         """Yield the frames in batches, corrected and on the device.
 
         This is the one path from storage into a reconstruction.  Each
-        batch is corrected (dark subtracted, clipped at zero, masked,
-        apodized, square-rooted to amplitude) as it is read, so the same
-        loop serves an in-memory array and a file too large to load.
+        batch is dark subtracted, clipped at zero, masked, apodized, and
+        square-rooted to amplitude as it is read.  Reading is prefetched
+        into pinned memory when the frames live in a file.
 
         Args:
-            batch_size (int): frames per batch.  The last batch is shorter.
+            batch_size (int): frames per batch.  The last batch is shorter;
+                the reconstruction loop pads it.
             device (str or torch.device, optional): where the batch is
                 placed.  Defaults to the CPU.
 
         Yields:
-            tuple: ``(indices, amplitude, patch_origins)`` with
-            ``indices`` the frame indices in the scan, ``amplitude`` a
-            float32 tensor ``(batch, height, width)``, and
-            ``patch_origins`` an int64 tensor ``(batch, 2)`` of the
-            integer object-grid row and column where each patch starts.
+            tuple: ``(indices, amplitude)`` with ``indices`` an int64
+            tensor of frame indices in scan order and ``amplitude`` a
+            float32 tensor ``(batch, height, width)``.
         """
         raise NotImplementedError
 
-    def select(self, indices=None, box=None):
-        """Return a sub-scan: the positions listed in ``indices``, or
-        those whose patches lie inside ``box``.
-
-        Args:
-            indices (sequence of int, optional): frame indices to keep.
-            box (tuple, optional): ``(row_min, row_max, col_min, col_max)``
-                in metres (or pixels for a pixel-declared scan).
-
-        Returns:
-            Scan: a new scan sharing the frame storage of this one.
-        """
+    def select(self, indices):
+        """Return a sub-scan of the listed frames, sharing this scan's
+        frame storage."""
         raise NotImplementedError
 
-    # ---------------------------------------------------------- inspection
     def parameters(self):
-        """Return the scan's facts as rows with provenance.
-
-        Returns:
-            list of dict: one row per fact with keys ``name``, ``value``,
-            ``units``, ``origin`` (``given``, ``file``, ``derived``, or
-            ``default``), and ``note`` (the formula for a derived value,
-            or the file a value was read from).
-        """
+        """Return the recorded facts as rows with provenance: keys
+        ``name``, ``value``, ``units``, ``origin`` (``given`` or
+        ``file``), and ``note``."""
         raise NotImplementedError
 
     def summary(self):
-        """Return a text summary: frame count and size, pixel size and
-        where it came from, scan extent in pixels and micrometres, the
-        object grid, the overlap fraction, and where the frames live."""
+        """Return a text summary: frame count and size, the recorded
+        instrument facts, the scan extent, which corrections are set,
+        and where the frames live."""
         raise NotImplementedError
 
     def show(self, directory=None):
-        """Plot one diffraction frame on a log scale, the position map,
-        and the coverage of the object grid.
+        """Plot one diffraction frame on a log scale and the position map.
 
         Args:
             directory (str, optional): where the figures are saved.  None
@@ -177,14 +113,13 @@ class Scan:
         """
         raise NotImplementedError
 
-    # ------------------------------------------------------------- storage
     def save(self, path):
         """Write the scan to an HDF5 file, streaming the frames.
 
-        The file holds the raw counts (chunked one frame per chunk), the
+        The file holds the raw counts chunked one frame per chunk, the
         positions with their units, the dark frame, the mask, the
-        apodization, the geometry, and the provenance of every value.
-        :meth:`open` reads it back.
+        apodization, the instrument facts, and the provenance of every
+        value.  :meth:`open` reads it back.
 
         Args:
             path (str): the file to write.
@@ -196,13 +131,12 @@ class Scan:
         """Open a scan file without loading the frames.
 
         The file may be one written by :meth:`save` or a CXI file; the
-        format is detected.  Frames are read in batches on demand.  Any
-        instrument fact passed as a keyword overrides the file's value
-        and is recorded with origin ``given``.
+        format is detected.  Any instrument fact passed as a keyword
+        overrides the file's value and is recorded as ``given``.
 
         Args:
-            path (str): an xptycho scan file or a CXI file.
-            **facts: any constructor argument, to override the file.
+            path (str): the file.
+            **facts: any constructor argument.
 
         Returns:
             Scan
@@ -215,15 +149,15 @@ class Scan:
         """Read the per-frame TIFF layout of the original ptycho_pmace code.
 
         The folder holds ``frame_data/`` with one TIFF per frame, sorted
-        by the integer in each filename, and a translation table whose
-        columns are the column and row of each position in pixels.
+        by the integer in each filename, and a table whose columns are
+        the column and row of each position in pixels.
 
         Args:
-            folder (str): the folder holding ``frame_data/`` and the table.
+            folder (str): the folder.
             positions_file (str, optional): the table's filename.
-            position_columns (tuple of str, optional): the column names,
-                given as (column, row); they are swapped to (row, column).
-            **facts: any constructor argument, for example the geometry.
+            position_columns (tuple of str, optional): the column names
+                as (column, row); they are swapped to (row, column).
+            **facts: any constructor argument.
 
         Returns:
             Scan
@@ -231,22 +165,32 @@ class Scan:
         raise NotImplementedError
 
 
-class FrameSource:
-    """Frames that live in a file and are read in batches.
+class FrameStore:
+    """Frames that live in a file and are read by range.
 
-    A ``FrameSource`` stands in for the frame array of a :class:`Scan`
-    whose data does not fit in memory.  It knows the file, the frame
-    count and shape, and how to read a contiguous range of frames.  The
-    reconstruction never sees it directly; it sees :meth:`Scan.batches`.
+    A ``FrameStore`` stands in for the frame array of a :class:`Scan`
+    whose data does not fit in memory.  A reader for a new file format
+    implements this protocol: the frame count and shape, and a read of
+    a contiguous range into a caller-supplied buffer.
 
     Args:
         path (str): the file.
-        dataset (str): the dataset inside the file holding the frames.
+        dataset (str, optional): the dataset inside the file holding the
+            frames, for HDF5-based formats.
     """
 
-    def __init__(self, path, dataset):
+    def __init__(self, path, dataset=None):
         raise NotImplementedError
 
-    def read(self, start, stop):
-        """Return frames ``start`` to ``stop`` as a numpy array of counts."""
+    @property
+    def num_frames(self):
+        raise NotImplementedError
+
+    @property
+    def frame_shape(self):
+        raise NotImplementedError
+
+    def read_into(self, start, stop, out):
+        """Read frames ``start`` to ``stop`` into ``out``, a preallocated
+        array of counts, and return it."""
         raise NotImplementedError

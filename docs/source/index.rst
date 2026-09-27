@@ -28,8 +28,8 @@ A reconstruction in one screen
    import xptycho
 
    scan = xptycho.Scan.open('scan.h5')          # frames, positions, geometry
-   recon = xptycho.pmace(scan, fit_probe=True, probe_modes=2,
-                         iterations=200)
+   model = xptycho.FarFieldModel.from_scan(scan, estimate_probe=True, probe_modes=2)
+   recon = model.recon(scan, method='pmace', iterations=200)
    recon.show()
    image = recon.object                         # complex, with recon.pixel_size
 

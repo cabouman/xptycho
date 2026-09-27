@@ -1,26 +1,26 @@
 """Scan position refinement."""
 
 
-def refine_positions(scan, recon, *, max_shift=1.0, step=1.0):
-    """Estimate corrected scan positions from a reconstruction.
+def refine_positions(model, scan, object, *, max_shift=1.0, step=1.0):
+    """Estimate corrected scan positions.
 
-    For each position, the shift within ``max_shift`` that best matches
-    the measured amplitude, given the reconstruction's object and probe,
-    is found by a grid search with spacing ``step``.  The scan is not
-    modified; the corrected positions are returned, to be given to a
-    new scan or a new reconstruction.
+    For each position, the shift within ``max_shift`` whose forward
+    projection of ``object`` best matches the measured amplitude is
+    found by a grid search with spacing ``step``, using the model's
+    probe.  Neither the model nor the scan is modified; the corrected
+    positions are returned for ``model.set_params(positions=...)``.
 
-    Version 1 searches integer shifts only.  Sub-pixel positions come in
-    version 2.
+    Version 1 searches integer shifts only.
 
     Args:
-        scan (Scan): the measurement.  Not modified.
-        recon (Reconstruction): the current object and probe.
+        model (PtychographyModel): the forward model with its probe.
+        scan (Scan): the measurement.
+        object (ndarray): the current object estimate.
         max_shift (float, optional): pixels, the largest shift searched
             along each axis.  Defaults to 1.
         step (float, optional): pixels, the search spacing.  Defaults to 1.
 
     Returns:
-        ndarray: ``(num_frames, 2)`` positions in the scan's units.
+        ndarray: ``(num_frames, 2)`` positions in metres.
     """
     raise NotImplementedError

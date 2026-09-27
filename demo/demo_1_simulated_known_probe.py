@@ -16,6 +16,7 @@ import xptycho
 # ---------------------------- Parameters ----------------------------
 # The scan.  The object pixel is 4.52 nm in the paper's simulation; the
 # step is 68 of those pixels.  Offsets are uniform on [-5, 5] pixels.
+ENERGY = 8.8                    # keV
 SCAN_GRID = (12, 12)            # scan positions along each axis
 SCAN_STEP = 68 * 4.52e-9        # m between positions
 MAX_OFFSET = 5 * 4.52e-9        # m, random offset of each position
@@ -36,24 +37,29 @@ OUTPUT_DIR = './output/demo_1_simulated_known_probe'
 # object pixel size of the simulation.
 truth = xptycho.demo_data('synthetic')
 
-# Simulate the scan: patches of the object under the probe, propagated
-# to the far field, with Poisson noise.  The result is a Scan holding
-# the frames, the positions, and the geometry.
+# Simulate the scan: the forward model at every position, then Poisson
+# noise.  The result is a Scan holding the frames, the positions, and
+# the geometry.
 scan = xptycho.simulate_scan(truth, grid=SCAN_GRID, step=SCAN_STEP,
-                             max_offset=MAX_OFFSET, peak_photons=PEAK_PHOTONS,
-                             dark_rate=DARK_RATE, seed=SEED)
-print(scan.summary())           # frame count, object grid, pixel size, overlap
+                             max_offset=MAX_OFFSET, energy=ENERGY,
+                             peak_photons=PEAK_PHOTONS, dark_rate=DARK_RATE,
+                             seed=SEED)
+print(scan.summary())
 scan.show(OUTPUT_DIR)           # one diffraction frame and the position map
 
-# The most important line: reconstruct the object by PMACE with the
-# probe held known.
-recon = xptycho.pmace(scan, probe=truth.probe, iterations=ITERATIONS,
-                      object_data_fit=OBJECT_DATA_FIT,
-                      probe_weight_exponent=PROBE_WEIGHT_EXPONENT,
-                      relaxation=RELAXATION)
+# The forward model: the scan's geometry, the derived object grid, and
+# the probe, known and held fixed.
+model = xptycho.FarFieldModel.from_scan(scan, probe=truth.probe)
+model.print_params()            # every value with its units and where it came from
 
-# Review: the parameter table with provenance, then the images and the
-# convergence curves, then everything saved to one folder.
+# The most important line: invert the forward model by PMACE.
+recon = model.recon(scan, method='pmace', iterations=ITERATIONS,
+                    object_data_fit=OBJECT_DATA_FIT,
+                    probe_weight_exponent=PROBE_WEIGHT_EXPONENT,
+                    relaxation=RELAXATION)
+
+# Review: the parameter table, then the images and the convergence
+# curves, then everything saved to one folder.
 print(recon.summary())
 recon.show(OUTPUT_DIR, compare_to=truth)
 recon.save(OUTPUT_DIR, compare_to=truth)
