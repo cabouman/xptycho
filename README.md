@@ -1,5 +1,9 @@
 # xptycho
 
+**Under construction.**  xptycho is being written.  The interface is
+designed and documented, and the reconstruction code is being ported
+from ptycho_pmace.  Nothing here runs yet.
+
 xptycho reconstructs the complex transmittance image of a thin object
 from a ptychographic scan: far-field diffraction patterns recorded
 while a focused X-ray probe steps across the object in overlapping

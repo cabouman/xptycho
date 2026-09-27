@@ -4,6 +4,12 @@ xptycho: Ptychographic Reconstruction with PMACE
 **Reconstruct the complex image of an object from a ptychographic
 scan, on one GPU or many.**
 
+.. warning::
+
+   Under construction.  xptycho is being written.  The interface is
+   designed and documented, and the reconstruction code is being ported
+   from ptycho_pmace.  Nothing here runs yet.
+
 A ptychographic scan records far-field diffraction patterns while a
 focused X-ray probe steps across a thin object in overlapping
 positions.  xptycho reconstructs the object's complex transmittance,
