@@ -3,8 +3,8 @@ devices, the per-position state, the curves, and the checkpoints."""
 
 
 class Batch:
-    """One batch of scan positions on one device, as the loop hands it to
-    an algorithm.
+    """One batch of scan positions on one device.  The loop builds one
+    per batch and passes it to the algorithm's ``pass_batch`` method.
 
     .. list-table::
        :header-rows: 1
@@ -53,7 +53,8 @@ class StateArray:
         device (torch.device): the device the rows are used on.
         placement (str, optional): ``'device'``, ``'host'``, ``'file'``,
             or ``'auto'`` (the default: the first that fits).
-        directory (str, optional): where a file-backed state lives.
+        directory (str, optional): the directory of the file when the
+            placement is ``'file'``.
     """
 
     def __init__(self, num_rows, field_shape, dtype, device, placement='auto',
@@ -89,32 +90,39 @@ class StateArray:
 
 
 class ReconLoop:
-    """The loop every algorithm runs in.
+    """Runs an algorithm over the scan for a given number of iterations.
 
-    The loop owns what an algorithm should not: the pass over batches,
-    the split of positions across devices and the reduction of the
-    sums after each pass, the per-position state arrays, the data
-    error and other curves, the parameter table, the log, and the
-    checkpoints.  An algorithm supplies three methods, ``start``,
-    ``pass_batch``, and ``end_pass``, and the loop guarantees:
+    The loop does the work that is the same for every algorithm.  It
+    reads the frames in batches, splits the positions across the
+    devices, allocates the per-position state arrays, sums the
+    algorithm's accumulators across the devices after each pass,
+    records the data error and the other curves, writes the log and
+    the parameter table, and writes checkpoints.  An algorithm
+    implements three methods, ``start``, ``pass_batch``, and
+    ``end_pass``.  The loop makes these guarantees to them:
 
-    * every position is visited once per pass, in storage order, in
-      batches of one size with a valid mask on the padded tail;
-    * the sums are zeroed before a pass, private to a device during it,
-      and reduced across devices after it, before ``end_pass``;
-    * nothing an algorithm computes inside a pass is visible inside the
-      same pass, so the result does not depend on the batch size or the
-      number of devices, which the test suite checks;
-    * checkpoints are written between passes, on the interval and on
-      SIGTERM, and a resumed run continues from the last one.
+    * Every position is processed once per pass, in storage order, in
+      batches of one fixed size.  The last batch is padded and its
+      ``valid`` mask marks the padding.
+    * The accumulators are set to zero before each pass.  During a pass
+      each device adds into its own copy.  After the pass the copies
+      are summed across the devices, before ``end_pass`` is called.
+    * A value the algorithm computes inside a pass is not readable
+      inside that same pass.  Because of this rule the result does not
+      depend on the batch size or on the number of devices.  The test
+      suite checks this.
+    * Checkpoints are written between passes, at a fixed time interval
+      and when the process receives SIGTERM.  A resumed run continues
+      from the last checkpoint.
 
-    One process drives all devices, with one worker thread per device.
-    Positions are partitioned contiguously in a spatially local order,
-    so each device reads a contiguous range of the file and scatters
-    into a bounded region of the object.
+    One process runs all the devices, with one worker thread per
+    device.  The positions are sorted into a spatially local order and
+    each device is given one contiguous range of that order, so each
+    device reads one contiguous range of the file and writes into one
+    bounded region of the object.
 
-    :meth:`PtychographyModel.recon` builds and runs a loop; use the
-    class directly for full control.
+    :meth:`PtychographyModel.recon` builds and runs a loop.  Use this
+    class directly to set every option.
 
     Args:
         model (PtychographyModel): the forward model.

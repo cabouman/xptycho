@@ -82,7 +82,8 @@ class PMACE:
             model (PtychographyModel): the forward model.
             scan (Scan): the measurement.
             init (ndarray): the starting object.
-            loop (ReconLoop): the loop that owns the arrays.
+            loop (ReconLoop): the loop, which allocates the state arrays and
+                the accumulators on request.
         """
         raise NotImplementedError
 

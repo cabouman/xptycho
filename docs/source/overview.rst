@@ -45,10 +45,10 @@ Scale
 
 Frames are read in batches and the consensus sums are accumulated
 across batches, so a scan larger than memory reconstructs on one
-GPU.  The per-position state of the iteration is kept on the device,
-in host memory, or in a file, whichever fits, and the choice is
-printed.  On a node with several GPUs the positions are split across
-them.
+GPU.  The per-position state of the iteration is placed on the device
+if it fits there, else in host memory if it fits there, else in a
+file.  The choice is printed.  On a node with several GPUs the
+positions are split across them.
 
 See :ref:`QuickStart` for a complete script and :ref:`Theory` for the
 equations.

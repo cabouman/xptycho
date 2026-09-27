@@ -7,9 +7,10 @@ User API
 xptycho is organized around one idea.  A :class:`~xptycho.PtychographyModel`
 is the forward map from an object image to the amplitudes measured at
 the scan positions.  An algorithm such as :class:`~xptycho.PMACE` is a
-way to invert that map.  One loop streams the scan positions through
-whichever pair you chose.  Everything physical is a model parameter or
-a model subclass; everything numerical is an algorithm.
+way to invert that map.  One loop reads the scan positions in batches
+and runs the chosen algorithm on the chosen model.  Every physical fact
+is a model parameter or a model subclass.  Every numerical choice is
+part of an algorithm.
 
 A reconstruction is three steps:
 
@@ -42,12 +43,13 @@ Streaming and large scans
 The script above does not change when the scan is too large for
 memory.  A :class:`~xptycho.Scan` opened from a file keeps its frames
 in the file and reads them in batches through
-:meth:`~xptycho.Scan.batches`, the only path from storage into a
-reconstruction.  The loop accumulates the algorithm's sums across the
+:meth:`~xptycho.Scan.batches`.  A reconstruction reads the frames only
+through that method.  The loop accumulates the algorithm's sums across the
 batches and reduces them once per pass, so the result does not depend
 on the batch size.  The per-position state of the iteration, which is
-larger than the frames, is kept on the GPU, in host memory, or in a
-file, whichever fits, and the choice is printed.  On a node with
+larger than the frames, is placed on the GPU if it fits there, else
+in host memory if it fits there, else in a file.  The choice is
+printed.  On a node with
 several GPUs the positions are split across them by
 :meth:`~xptycho.PtychographyModel.configure_devices`, and one process
 drives them all.  A run given a checkpoint directory writes

@@ -5,15 +5,15 @@ class Scan:
     """A ptychographic measurement: the diffraction frames, the recorded
     scan positions, the corrections, and the instrument facts.
 
-    A ``Scan`` holds what was measured and nothing that is chosen.  The
-    object grid, the positions used, and the probe belong to the
-    :class:`~xptycho.PtychographyModel`.  Frames are detector counts,
-    one per position.  They are held in memory when the scan is small
-    and read from a file in batches when it is not; a reconstruction
-    takes them only through :meth:`batches`, so it sees no difference.
-    Dark subtraction, the validity mask, the apodization window, and
-    the square root are applied to each batch as it is read, so the
-    stored frames stay raw.
+    A ``Scan`` holds the measured data.  The object grid, the positions
+    used, and the probe are parameters of the
+    :class:`~xptycho.PtychographyModel`, not of the scan.  Frames are
+    detector counts, one per position.  They are held in memory when
+    the scan is small and read from a file in batches when it is not.
+    A reconstruction reads them only through :meth:`batches`, which
+    behaves the same in both cases.  Dark subtraction, the validity
+    mask, the apodization window, and the square root are applied to
+    each batch as it is read.  The stored frames are the raw counts.
 
     A ``Scan`` is never modified by a reconstruction.
 
@@ -69,10 +69,11 @@ class Scan:
     def batches(self, batch_size, device=None):
         """Yield the frames in batches, corrected and on the device.
 
-        This is the one path from storage into a reconstruction.  Each
-        batch is dark subtracted, clipped at zero, masked, apodized, and
-        square-rooted to amplitude as it is read.  Reading is prefetched
-        into pinned memory when the frames live in a file.
+        A reconstruction reads the frames only through this method.
+        Each batch is dark subtracted, clipped at zero, masked, apodized,
+        and square-rooted to amplitude as it is read.  When the frames
+        are in a file, the next batch is read into pinned memory while
+        the current batch is used.
 
         Args:
             batch_size (int): frames per batch.  The last batch is shorter;
@@ -166,12 +167,13 @@ class Scan:
 
 
 class FrameStore:
-    """Frames that live in a file and are read by range.
+    """Frames in a file, read by contiguous range.
 
-    A ``FrameStore`` stands in for the frame array of a :class:`Scan`
-    whose data does not fit in memory.  A reader for a new file format
-    implements this protocol: the frame count and shape, and a read of
-    a contiguous range into a caller-supplied buffer.
+    A :class:`Scan` whose frames do not fit in memory holds a
+    ``FrameStore`` in place of the frame array.  A reader for a new
+    file format implements the three members below: the frame count,
+    the frame shape, and a read of frames ``start`` to ``stop`` into a
+    buffer the caller supplies.
 
     Args:
         path (str): the file.

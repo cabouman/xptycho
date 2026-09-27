@@ -9,11 +9,11 @@ class PtychographyModel:
     A model holds every physical fact of the measurement: the scan
     positions used, the probe modes, the object grid (shape, origin,
     pixel size), and the instrument facts the pixel size follows from.
-    It provides the projections between the object and the data, and
-    :meth:`recon`, which inverts them with a chosen algorithm.  The
-    measurement itself, the frames, lives in a :class:`~xptycho.Scan`
-    and is passed to the methods that need it, so a model can be built
-    and used without data, for example to simulate.
+    It computes the projections between the object and the data, and
+    :meth:`recon` inverts them with a chosen algorithm.  The frames are
+    not part of the model.  They are in a :class:`~xptycho.Scan`, which
+    is passed to the methods that need it, so a model can be built and
+    used without data, for example to simulate.
 
     This base class holds everything that does not depend on how light
     propagates from the object to the detector.  A subclass supplies
@@ -272,8 +272,9 @@ class PtychographyModel:
         the algorithm's sums are accumulated across batches and reduced
         once per pass, so a scan larger than memory reconstructs the way
         a small one does.  The per-position state of the iteration is
-        kept on the device, in host memory, or in a file under
-        ``checkpoint_dir``, whichever fits, and the choice is printed.
+        placed on the device if it fits there, else in host memory if it
+        fits there, else in a file under ``checkpoint_dir``.  The choice
+        is printed.
         The devices and the batch size are those set on the model, or
         chosen automatically.
 
