@@ -63,3 +63,10 @@ What xptycho gives you
    usr_api
    theory
    credits
+
+.. toctree::
+   :hidden:
+   :maxdepth: 2
+   :caption: Developer Guide
+
+   dev_release
