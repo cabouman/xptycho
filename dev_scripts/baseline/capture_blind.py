@@ -63,7 +63,9 @@ def main():
     init_obj = pu.gen_init_obj(y_meas, patch_bounds, ones.shape, ref_probe=init_probe)
     print(f'{len(y_meas)} frames of {y_meas.shape[1]}x{y_meas.shape[2]}, object {ref_obj.shape}')
 
-    for name, args in RUNS.items():
+    names = sys.argv[3].split(',') if len(sys.argv) > 3 else list(RUNS)   # optional: which runs
+    for name in names:
+        args = RUNS[name]
         run_dir = make_run_dir(OUTPUT_ROOT, name)
         save_inputs(run_dir, ref_obj=ref_obj, ref_probe_mode_0=ref_modes[0],
                     ref_probe_mode_1=ref_modes[1], y_meas=y_meas, scan_loc=scan_loc,
@@ -95,7 +97,8 @@ def main():
                       window=WINDOW, iterations=ITERATIONS, joint_recon=True, rho=RHO,
                       sampling_interval=SAMPLING_INTERVAL, wavelength=WAVELENGTH,
                       propagation_dist=PROPAGATION_DIST, seed=0, num_modes_final=len(modes),
-                      **{k: (v if not isinstance(v, list) else str(v)) for k, v in args.items()},
+                      **{k: (v if not isinstance(v, list) else str(v)) for k, v in args.items()
+                         if k not in ('wavelength', 'propagation_dist')},
                       **iterate_numbers(est))
         write_params(run_dir, params, PMACE_DIR, timer.seconds)
         probe_lines = [f'final nrmse_probe_mode_{k} {curve[-1]:.6f}'
