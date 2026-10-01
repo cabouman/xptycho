@@ -12,7 +12,7 @@ sys.path.insert(0, os.path.abspath('../..'))
 
 project = 'xptycho'
 copyright = '2026, Charles A. Bouman'
-author = 'Charles A. Bouman'
+author = 'Charles A. Bouman and Brendt Wohlberg'
 
 import xptycho
 release = xptycho.__version__

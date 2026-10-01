@@ -5,6 +5,8 @@ type: software
 authors:
   - family-names: Bouman
     given-names: Charles A.
+  - family-names: Wohlberg
+    given-names: Brendt
 version: 0.0.1
 date-released: 2026-09-26
 url: "https://xptycho.readthedocs.io"

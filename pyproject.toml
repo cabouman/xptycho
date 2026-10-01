@@ -11,6 +11,7 @@ requires-python = ">=3.11"
 dynamic = ["version"]
 authors = [
     { name = "Charles A. Bouman" },
+    { name = "Brendt Wohlberg" },
 ]
 dependencies = [
     "numpy",
