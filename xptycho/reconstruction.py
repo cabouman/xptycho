@@ -1,17 +1,18 @@
-"""The Reconstruction: what a reconstruction returns."""
+"""The Reconstruction: what :meth:`~xptycho.PtychoModel.recon` returns."""
+import csv
+import os
+
+import h5py
+import numpy as np
 
 
 class Reconstruction:
-    """The result of a reconstruction.
+    """The result of a reconstruction: the two unknowns and the record of
+    the run.
 
-    The primary result is ``object``, the complex transmittance image;
-    its magnitude and phase are both retained, and ``phase`` and
-    ``magnitude`` are views for display.  The phase is in radians,
-    wrapped to ``(-pi, pi]``, with the convention that a thicker object
-    gives a more negative phase.  A ``Reconstruction`` can be passed
-    back to :meth:`~xptycho.PtychographyModel.recon` as ``init`` to
-    continue a run, and :meth:`save` writes the folder a laminography
-    reconstruction reads.
+    A ``Reconstruction`` can be passed back to
+    :meth:`~xptycho.PtychoModel.recon` as ``init`` to start another run
+    from it, and :meth:`save` writes a folder that :meth:`load` reads.
 
     .. list-table::
        :header-rows: 1
@@ -22,92 +23,117 @@ class Reconstruction:
          - meaning
        * - ``object``
          - complex64 ``(rows, cols)``
-         - the transmittance image on the object grid
-       * - ``pixel_size``
-         - float, metres
-         - the object pixel; None when the scan had no geometry
-       * - ``origin``
-         - ``(row, col)``, metres
-         - the grid's first pixel, in the coordinates of the positions
+         - the object image on the object grid
        * - ``probe``
-         - complex64 ``(modes, height, width)``
-         - the probe the run used or estimated, always three axes
-       * - ``mode_energies``
-         - float ``(modes,)``
-         - the fraction of the probe energy in each mode
+         - complex64 ``(K, n, n)``
+         - the probe modes the run used or estimated
+       * - ``pixel_size``
+         - float, meters
+         - the size of an object pixel
+       * - ``origin``
+         - ``(row, col)``, meters
+         - the position of the center of the first pixel of the grid
        * - ``coverage``
          - float32 ``(rows, cols)``
          - the accumulated probe weight; zero where no probe reached
        * - ``positions``
-         - float64 ``(num_frames, 2)``, metres
+         - float64 ``(J, 2)``, meters
          - the positions the run used
+       * - ``mode_energies``
+         - float ``(K,)``
+         - the share of the probe energy in each mode
+       * - ``params``
+         - list of dict
+         - every parameter of the run with its value, units, and origin
        * - ``curves``
          - dict of lists
-         - ``data_error`` per iteration; ``object_error`` and
-           ``probe_error`` when a ground truth was given
+         - ``data_error`` per iteration
        * - ``iterations``
          - int
-         - iterations run, including any continued from
-       * - ``algorithm``
-         - str
-         - the algorithm's name
+         - the iterations run
     """
 
-    def __init__(self, object, pixel_size, origin, probe, coverage, positions, curves,
-                 iterations, algorithm, parameters):
-        raise NotImplementedError
+    def __init__(self, object, probe, pixel_size, origin, coverage, positions, params, curves, iterations):
+        self.object = object
+        self.probe = probe
+        self.pixel_size = pixel_size
+        self.origin = tuple(origin)
+        self.coverage = coverage
+        self.positions = positions
+        self.params = params
+        self.curves = curves
+        self.iterations = iterations
+
+    @property
+    def mode_energies(self):
+        energy = (np.abs(self.probe) ** 2).sum(axis=(-2, -1))
+        return energy / energy.sum()
 
     @property
     def phase(self):
-        """float32 ``(rows, cols)``: the wrapped phase of ``object``."""
-        raise NotImplementedError
+        """The phase of the object in radians, float32."""
+        return np.angle(self.object).astype(np.float32)
 
     @property
     def magnitude(self):
-        """float32 ``(rows, cols)``: the magnitude of ``object``."""
-        raise NotImplementedError
-
-    def parameters(self):
-        """Return the parameter table of the run: the model's parameters,
-        the algorithm's, and the loop's settings, as rows with keys
-        ``name``, ``value``, ``units``, ``origin`` (``given``, ``file``,
-        ``derived``, ``default``, or ``estimated``), and ``note``."""
-        raise NotImplementedError
+        """The magnitude of the object, float32."""
+        return np.abs(self.object).astype(np.float32)
 
     def summary(self):
-        """Return the parameter table as text, followed by the iteration
-        count, the final errors, the run time, and the devices used."""
-        raise NotImplementedError
+        """Return the parameter table as text, then the outcome of the run."""
+        width = max(len(row['name']) for row in self.params)
+        lines = ['Reconstruction', '  parameters:']
+        for row in self.params:
+            lines.append('    {:<{w}}  {}  {}  [{}]'.format(row['name'], row['value'], row['units'], row['origin'], w=width))
+        lines.append('  iterations: {}'.format(self.iterations))
+        if self.curves.get('data_error'):
+            lines.append('  final data error: {:.6f}'.format(self.curves['data_error'][-1]))
+        lines.append('  mode energies: ' + ', '.join('{:.4f}'.format(e) for e in self.mode_energies))
+        return '\n'.join(lines)
 
     def show(self, directory=None, compare_to=None):
-        """Plot the object magnitude and phase over the coverage, the
-        probe modes with their energy fractions, and the convergence
-        curves.
+        """Plot the magnitude and phase of the object, the probe modes, and
+        the data-error curve.
 
         Args:
             directory (str, optional): where the figures are saved.  None
                 shows them without saving.
-            compare_to (GroundTruth, optional): adds the truth and the
-                error images, and prints the NRMSE after removing one
-                complex scale.
+            compare_to (optional): a truth with ``object`` and ``probe``
+                attributes.  Adds the truth and prints the NRMSE of the
+                object over the covered pixels.
         """
-        raise NotImplementedError
+        from .view import show_reconstruction
+        show_reconstruction(self, directory, compare_to)
 
-    def save(self, directory, compare_to=None):
-        """Write one self-contained folder: ``summary.txt``,
-        ``parameters.csv``, ``recon.h5`` (the object, the probe, the
-        positions, the coverage, and the curves, with the pixel size, the
-        origin, and the provenance as attributes), preview TIFFs of the
-        phase and the magnitude, and ``plots/``.  ``recon.h5`` is the
-        file a laminography reconstruction reads.
-
-        Args:
-            directory (str): the folder to write.
-            compare_to (GroundTruth, optional): as in :meth:`show`.
-        """
-        raise NotImplementedError
+    def save(self, directory):
+        """Write one folder: ``summary.txt``, ``parameters.csv``, and
+        ``recon.h5`` (the object, the probe, the positions, the coverage,
+        and the curves, with the pixel size and origin as attributes)."""
+        os.makedirs(directory, exist_ok=True)
+        with open(os.path.join(directory, 'summary.txt'), 'w') as f:
+            f.write(self.summary() + '\n')
+        with open(os.path.join(directory, 'parameters.csv'), 'w', newline='') as f:
+            writer = csv.DictWriter(f, fieldnames=['name', 'value', 'units', 'origin'])
+            writer.writeheader()
+            writer.writerows(self.params)
+        with h5py.File(os.path.join(directory, 'recon.h5'), 'w') as f:
+            f.create_dataset('object', data=self.object)
+            f.create_dataset('probe', data=self.probe)
+            f.create_dataset('coverage', data=self.coverage)
+            f.create_dataset('positions', data=self.positions)
+            for name, values in self.curves.items():
+                f.create_dataset('curves/' + name, data=np.asarray(values))
+            f.attrs['pixel_size'] = self.pixel_size
+            f.attrs['origin'] = self.origin
+            f.attrs['iterations'] = self.iterations
 
     @classmethod
     def load(cls, directory):
         """Read a folder written by :meth:`save`."""
-        raise NotImplementedError
+        with open(os.path.join(directory, 'parameters.csv'), newline='') as f:
+            params = list(csv.DictReader(f))
+        with h5py.File(os.path.join(directory, 'recon.h5'), 'r') as f:
+            curves = {name: list(f['curves'][name][...]) for name in f.get('curves', {})}
+            return cls(f['object'][...], f['probe'][...], float(f.attrs['pixel_size']),
+                       tuple(f.attrs['origin']), f['coverage'][...], f['positions'][...],
+                       params, curves, int(f.attrs['iterations']))
