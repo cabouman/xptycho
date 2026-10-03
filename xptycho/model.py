@@ -189,13 +189,13 @@ class PtychoModel:
         """Choose the devices a reconstruction runs on.
 
         Without a call the model chooses automatically: every CUDA GPU,
-        else the CPU.  With several devices, the positions and the object
+        else Apple's GPU (mps), else the CPU.  With several devices, the positions and the object
         image are divided among them; see the Computing page of the design.
 
         Args:
             num_devices (int, optional): the number of CUDA GPUs to use.
-                1 (the default) uses the first GPU, or the CPU when there
-                is none.
+                1 (the default) uses the first GPU; with no CUDA GPU,
+                Apple's GPU or the CPU.
             devices (list, optional): the devices, for example
                 ``['cuda:0', 'cuda:2']`` or ``['cpu']``.  Overrides
                 ``num_devices``.
@@ -204,14 +204,19 @@ class PtychoModel:
             available = torch.cuda.device_count()
             if num_devices > 1 and num_devices > available:
                 raise ValueError('{} devices were asked for but this node has {} CUDA GPUs'.format(num_devices, available))
-            devices = ['cuda:{}'.format(i) for i in range(num_devices)] if available else ['cpu']
+            if available:
+                devices = ['cuda:{}'.format(i) for i in range(num_devices)]
+            else:
+                devices = ['mps' if torch.backends.mps.is_available() else 'cpu']
         self._devices = [torch.device(d) for d in devices]
 
     def _device_list(self):
         if self._devices is not None:
             return self._devices
         count = torch.cuda.device_count()
-        return [torch.device('cuda:{}'.format(i)) for i in range(count)] if count else [torch.device('cpu')]
+        if count:
+            return [torch.device('cuda:{}'.format(i)) for i in range(count)]
+        return [torch.device('mps' if torch.backends.mps.is_available() else 'cpu')]
 
     def _batch_size(self, device):
         if self._recon['batch_size'] is not None:
@@ -219,7 +224,7 @@ class PtychoModel:
         if device.type == 'cuda':
             free, _ = torch.cuda.mem_get_info(device)
             return max(1, int(0.8 * free / (110 * self.frame_size ** 2)))
-        return 64
+        return max(1, 2 ** 24 // self.frame_size ** 2)      # about 2 GB of temporary arrays
 
     # ------------------------------------------------------ the forward model
     def _check_probe(self, probe):

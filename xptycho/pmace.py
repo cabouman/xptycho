@@ -252,16 +252,15 @@ class Run:
         errors, norms = [], []
         for g in range(len(self.layout)):
             d = self.d[g]
-            error = torch.zeros((), dtype=torch.float64, device=d.device)
-            norm = torch.zeros((), dtype=torch.float64, device=d.device)
             for batch in self._batches(g):
                 p, y = self._image_patches(g, batch), self.y[g][batch]
                 predicted = torch.sqrt((op.fft2c(d[:, None] * p).abs() ** 2).sum(dim=0))
-                error += ((predicted - y) ** 2).sum()
-                norm += (y ** 2).sum()
-            errors.append(error)
-            norms.append(norm)
-        return float(torch.sqrt(self.layout.sum_small(errors) / self.layout.sum_small(norms)))
+                errors.append(((predicted - y) ** 2).sum())
+                norms.append((y ** 2).sum())
+        # The batch sums are added in double precision on the host.
+        error = sum(float(e) for e in torch.stack([e.cpu() for e in errors]).double())
+        norm = sum(float(n) for n in torch.stack([n.cpu() for n in norms]).double())
+        return (error / norm) ** 0.5
 
     def object(self):
         """The reported image on the host, complex64 ``(rows, cols)``."""
