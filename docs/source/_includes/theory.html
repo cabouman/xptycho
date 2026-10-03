@@ -1,0 +1,194 @@
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one reading column; the four kinds of quantities are color-coded cards; the iteration is a mono block with local/global tags. */
+:root {
+  --bg: #fbfaf7; --surface: #ffffff; --fg: #1f2328; --muted: #5f6670; --line: #d9d7d0;
+  --data: #b7791f;   --data-bg: #fdf3df;
+  --unk: #2b6cb0;    --unk-bg: #e3eefb;
+  --par: #2f855a;    --par-bg: #e2f3e8;
+  --state: #6b46c1;  --state-bg: #ece6f8;
+  --local: #2f855a; --global: #c53030;
+  --sans: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+  --mono: "IBM Plex Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #15171b; --surface: #1d2025; --fg: #e6e4df; --muted: #a0a6ae; --line: #343a42;
+  --data: #e2b05a; --data-bg: #3a2f17; --unk: #7fb0ea; --unk-bg: #1b2d44; --par: #7cc99a; --par-bg: #163123;
+  --state: #b59cf0; --state-bg: #2a2140; --local: #7cc99a; --global: #f08a8a; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #15171b; --surface: #1d2025; --fg: #e6e4df; --muted: #a0a6ae; --line: #343a42;
+  --data: #e2b05a; --data-bg: #3a2f17; --unk: #7fb0ea; --unk-bg: #1b2d44; --par: #7cc99a; --par-bg: #163123;
+  --state: #b59cf0; --state-bg: #2a2140; --local: #7cc99a; --global: #f08a8a; color-scheme: dark }
+
+.pmace { color: var(--fg); font-family: var(--sans); font-size: 16px; line-height: 1.55; }
+.pmace .wrap { max-width: 900px; margin: 0; padding: 0; }
+.pmace h1 { font-size: 30px; font-weight: 700; margin: 0 0 4px; text-wrap: balance; }
+.pmace h2 { font-size: 22px; font-weight: 700; margin: 44px 0 10px; text-wrap: balance; }
+.pmace h3 { font-size: 17px; font-weight: 700; margin: 22px 0 6px; }
+.pmace p { max-width: 70ch; margin: 0 0 10px; }
+.pmace .lead { color: var(--muted); font-size: 17px; }
+.pmace code { font-family: var(--mono); font-size: 0.9em; }
+.pmace mjx-container { font-size: 105%; }
+.pmace .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; margin: 14px 0; }
+.pmace .kind { background: var(--surface); border: 1px solid var(--line); border-top: 4px solid; border-radius: 6px; padding: 12px 16px 14px; min-width: 0; }
+.pmace .kind h3 { margin: 0 0 2px; }
+.pmace .kind .when { font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+.pmace .kind ul { margin: 0; padding-left: 18px; }
+.pmace .kind li { margin: 4px 0; }
+.pmace .k-data { border-top-color: var(--data); } .k-unk { border-top-color: var(--unk); } .k-par { border-top-color: var(--par); } .k-state { border-top-color: var(--state); }
+.pmace .ops { display: grid; grid-template-columns: 1fr; gap: 10px; }
+.pmace .op { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 10px 16px; }
+.pmace .op b { display: block; margin-bottom: 2px; }
+.pmace .op .uses { font-size: 13.5px; color: var(--muted); }
+.pmace .op mjx-container[display="true"] { margin: 8px 0 !important; }
+.pmace .algo { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px; font-family: var(--mono); font-size: 14.5px; line-height: 1.7; overflow-x: auto; }
+.pmace .algo .ln { display: flex; gap: 14px; align-items: baseline; white-space: nowrap; }
+.pmace .algo .ind { padding-left: 2.2em; }
+.pmace .algo .cm { color: var(--muted); font-family: var(--sans); font-size: 13.5px; }
+.pmace .tag { display: inline-block; font-family: var(--sans); font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding: 1px 7px; border-radius: 3px; min-width: 52px; text-align: center; }
+.pmace .tag.l { color: var(--local); border: 1px solid var(--local); }
+.pmace .tag.g { color: var(--global); border: 1px solid var(--global); }
+.pmace .shape { display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; gap: 8px; align-items: center; margin: 14px 0; max-width: 720px; }
+.pmace .shape .step { border: 1.5px solid; border-radius: 6px; padding: 8px 10px; text-align: center; font-size: 14px; background: var(--surface); }
+.pmace .shape .step b { display: block; font-size: 13px; letter-spacing: 0.05em; text-transform: uppercase; }
+.pmace .shape .sl { border-color: var(--local); } .shape .sg { border-color: var(--global); }
+.pmace .shape .arrow { color: var(--muted); font-size: 22px; }
+.pmace ol.facts { max-width: 72ch; padding-left: 22px; }
+.pmace ol.facts li { margin: 10px 0; }
+.pmace table.params { border-collapse: collapse; margin: 12px 0; font-size: 15px; }
+.pmace table.params th, .pmace table.params td { border-bottom: 1px solid var(--line); padding: 6px 14px 6px 0; text-align: left; vertical-align: top; }
+.pmace table.params th { font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.pmace .ask { border-left: 4px solid var(--unk); background: var(--surface); padding: 10px 16px; max-width: 72ch; margin: 16px 0; }
+@media (max-width: 520px) { .pmace .shape { grid-template-columns: 1fr; } .pmace .shape .arrow { text-align: center; transform: rotate(90deg); } }
+</style>
+<div class="pmace mathjax_process">
+<div class="wrap">
+<p class="lead">What the algorithm in the two TCI papers (2023, known probe; 2025, blind multi-mode) is made of, organized by the kinds of quantities it uses, before any code. The 2023 algorithm is the special case \(K=1\) with the probe held fixed, so this page describes one algorithm.</p>
+
+<h2>1. The quantities</h2>
+<p>There are four kinds. They differ in who sets them and how long they live.</p>
+<div class="grid">
+  <div class="kind k-data">
+    <h3>Measured data</h3>
+    <div class="when">Fixed for the whole run. Never modified.</div>
+    <ul>
+      <li>\(y_j\), one per scan position \(j = 0,\dots,J-1\): the measured amplitude, an \(N_p \times N_p\) real array. It is the square root of the detector counts after dark subtraction and masking.</li>
+      <li>The scan positions. They define \(P_j\), the operator that cuts patch \(j\) out of the object.</li>
+      <li>Instrument facts (wavelength, distance, detector pixel). The algorithm never uses them. They convert positions from meters to pixels and give the pixel size of the answer.</li>
+    </ul>
+  </div>
+  <div class="kind k-unk">
+    <h3>Unknowns</h3>
+    <div class="when">Estimated by the run. What comes out.</div>
+    <ul>
+      <li>\(x\): the object, \(N_1 \times N_2\) complex transmittance. The output.</li>
+      <li>\(d_k\), \(k = 0,\dots,K-1\): the probe modes, each \(N_p \times N_p\) complex. Known and fixed in the 2023 paper; estimated in the 2025 paper.</li>
+    </ul>
+  </div>
+  <div class="kind k-par">
+    <h3>Design parameters</h3>
+    <div class="when">Chosen by the user. Never estimated.</div>
+    <ul>
+      <li>\(\alpha_1\): object data-fit weight. \(\alpha_2\): probe data-fit weight.</li>
+      <li>\(\kappa \in [1,2]\): exponent on \(|d_k|\) in the averaging weights.</li>
+      <li>\(\rho \in (0,1)\): the Mann step.</li>
+      <li>\(K\): the number of modes, the iteration at which each new mode is added, and the energy fraction a new mode gets.</li>
+      <li>The number of iterations.</li>
+      <li>(\(\varepsilon\) in the stable inverse is a fixed formula, \(10^{-6}\sqrt{\|d\|^2/\dim d}\), not a choice.)</li>
+    </ul>
+  </div>
+  <div class="kind k-state">
+    <h3>Run state</h3>
+    <div class="when">Exists only during the run. Discarded after.</div>
+    <ul>
+      <li>\(\mathbf{v} = [v_0,\dots,v_{J-1}]\): one complex \(N_p \times N_p\) patch per scan position. This is the PMACE state. It is the same size as the data.</li>
+      <li>Blind case only: \(\mathbf{s}_k = [d_{0,k},\dots,d_{J-1,k}]\): one probe estimate per position, per mode. Also the size of the data, once per mode.</li>
+      <li>Temporaries \(\mathbf{w}, \mathbf{z}\) (patches) and \(\mathbf{r}_k, \mathbf{u}_k\) (probes).</li>
+    </ul>
+    <p style="margin:8px 0 0;font-size:14px">The object \(x\) is not state. It is computed from \(\mathbf{v}\) by the weighted average whenever it is needed, and that same average is the final answer.</p>
+  </div>
+</div>
+
+<h2>2. The operators</h2>
+<p>Building blocks first, then the four steps the iteration is made of.</p>
+<div class="ops">
+  <div class="op"><b>Building blocks</b>
+    \(P_j\) cuts out patch \(j\); \(P_j^T\) adds a patch back into the image at position \(j\).
+    \(\mathcal{F}, \mathcal{F}^*\): the orthonormal 2D DFT and its inverse.
+    \(D_k = \mathrm{diag}(d_k)\), with stable inverse \(D_{k,\varepsilon}^{-1} = \mathrm{diag}\big(d_k^* / (|d_k|^2 + \varepsilon)\big)\).
+    \(\Lambda_k = \sum_j P_j^T |D_k|^\kappa P_j\): the coverage map, an image-sized diagonal; it changes whenever the probe changes.
+    \(w_k = \|d_k\|^2 / \sum_m \|d_m\|^2\): the energy weight of mode \(k\).
+  </div>
+  <div class="op"><b>Patch data-fit step \(F^I_j\)</b>
+    <span class="uses">one patch in, one patch out; uses only \(y_j\), \(v_j\), and the modes</span>
+    \[\tilde v_{j,k} = D_{k,\varepsilon}^{-1}\,\mathcal{F}^*\!\left( y_j \circ \frac{\mathcal{F} D_k v_j}{\sqrt{\sum_m |\mathcal{F} D_m v_j|^2}} \right), \qquad
+      F^I_j(v_j) = (1-\alpha_1)\, v_j + \alpha_1 \sum_k w_k\, \tilde v_{j,k}\]
+  </div>
+  <div class="op"><b>Patch averaging step \(\mathbf{G}^I\)</b>
+    <span class="uses">all patches in, all patches out, through the image</span>
+    \[\bar x = \sum_k w_k\, \Lambda_k^{-1} \sum_j P_j^T |D_k|^\kappa v_j, \qquad (\mathbf{G}^I \mathbf{v})_j = P_j\, \bar x\]
+  </div>
+  <div class="op"><b>Probe data-fit step \(F^P_{j,k}\)</b>
+    <span class="uses">uses the consensus patch \(z_j\), \(y_j\), and all modes at position \(j\)</span>
+    \[\tilde d_{j,k} = X_{j,\varepsilon}^{-1}\,\mathcal{F}^*\!\left( y_j \circ \frac{\mathcal{F} X_j d_{j,k}}{\sqrt{\sum_m |\mathcal{F} X_j d_{j,m}|^2}} \right), \quad X_j = \mathrm{diag}(z_j), \qquad
+      F^P_{j,k}(d_{j,k}) = (1-\alpha_2)\, d_{j,k} + \alpha_2\, \tilde d_{j,k}\]
+  </div>
+  <div class="op"><b>Probe averaging step \(\mathbf{G}^P\)</b>
+    <span class="uses">the plain mean over positions</span>
+    \[\bar d_k = \frac{1}{J} \sum_j d_{j,k}\]
+  </div>
+</div>
+
+<h2>3. One iteration</h2>
+<p>Algorithm 1 of the 2025 paper. Each line is tagged <span class="tag l">local</span> when every position is handled on its own, or <span class="tag g">global</span> when it needs a sum over all positions.</p>
+<div class="algo">
+  <div class="ln"><span class="tag l">local</span><span>w ← F<sup>I</sup>(v)</span><span class="cm">each position fits its own data</span></div>
+  <div class="ln"><span class="tag g">global</span><span>z ← G<sup>I</sup>(2w − v)</span><span class="cm">one scatter-add over all j, divide by Λ, one gather</span></div>
+  <div class="ln"><span class="tag l">local</span><span>v ← v + 2ρ (z − w)</span><span class="cm">Mann update</span></div>
+  <div class="ln"><span class="tag" style="visibility:hidden">x</span><span>for each mode k:</span><span class="cm">blind case only</span></div>
+  <div class="ln ind"><span class="tag l">local</span><span>r<sub>k</sub> ← F<sup>P</sup><sub>k</sub>(s<sub>k</sub>; z)</span><span class="cm">each position refines its own probe, using its consensus patch z<sub>j</sub></span></div>
+  <div class="ln ind"><span class="tag g">global</span><span>u<sub>k</sub> ← G<sup>P</sup>(2r<sub>k</sub> − s<sub>k</sub>)</span><span class="cm">one mean over all j</span></div>
+  <div class="ln ind"><span class="tag l">local</span><span>s<sub>k</sub> ← s<sub>k</sub> + 2ρ (u<sub>k</sub> − r<sub>k</sub>)</span><span class="cm">Mann update</span></div>
+  <div class="ln"><span class="tag" style="visibility:hidden">x</span><span>add a mode if scheduled</span><span class="cm">from the residual intensity; rescale so the total energy is unchanged</span></div>
+  <div class="ln" style="margin-top:8px"><span class="tag" style="visibility:hidden">x</span><span>output: x̂ = weighted average of v;&nbsp; d̂<sub>k</sub> = mean of s<sub>k</sub></span></div>
+</div>
+
+<p style="margin-top:16px">Every pass has the same shape:</p>
+<div class="shape">
+  <div class="step sl"><b>local</b>each position: its own \(y_j\), its own state row, the current consensus</div>
+  <div class="arrow">&rarr;</div>
+  <div class="step sg"><b>global</b>one sum over all positions, then broadcast back</div>
+  <div class="arrow">&rarr;</div>
+  <div class="step sl"><b>local</b>each position updates its own state row</div>
+</div>
+<p>Once per iteration for the patches, and once more per mode for the probes when the probe is estimated. That is the entire communication pattern.</p>
+
+<h2>4. Initialization</h2>
+<p>Two formulas. The probe first, from the mean back-transformed data, propagated a chosen distance \(z\) by Fresnel propagation \(U\):</p>
+\[ d^{(0)} = U_{\eta,z,\Delta_x}\left\{ \frac{1}{J}\sum_j (P_j \mathbf{1})^{-1}\, \mathcal{F}^* y_j \right\} \]
+<p>Then the object, so that each patch has the right scale:</p>
+\[ x^{(0)} = \Lambda_0^{-1} \sum_j P_j^T \left( \frac{\|y_j\|}{\|d^{(0)}\|}\, \mathbf{1} \right), \qquad \Lambda_0 = \sum_j P_j^T P_j \]
+<p>A new mode comes from the residual intensity the current modes do not explain, \(I_j - \sum_k |\mathcal{F} D_k x_j|^2\), back-transformed, divided by the patch, averaged over positions, and Fresnel propagated; then all modes are rescaled so the total energy is unchanged.</p>
+
+<h2>5. The facts that matter for code</h2>
+<ol class="facts">
+  <li><b>Every pass is local, global, local.</b> The local maps need only their own \(y_j\), their own state row, and the current consensus. The global step is one sum over \(j\). This is what lets the data stream through in batches and across GPUs without changing the answer.</li>
+  <li><b>The state is as large as the data, times \((1+K)\).</b> The old code keeps \(\mathbf{v}\) and every \(\mathbf{s}_k\) in memory at once. For integrated-circuit scans that is what does not fit, so where \(\mathbf{v}\) and \(\mathbf{s}_k\) live is the first design question, not an afterthought.</li>
+  <li><b>The averaging step is scatter-add, divide by coverage, gather.</b> Nothing else touches the whole image. \(\Lambda_k\) is itself a scatter-add of \(|d_k|^\kappa\), recomputed when the probe changes.</li>
+  <li><b>The probe step uses the consensus patch \(z_j\), not \(v_j\).</b> So the probe pass needs the patches from the image pass of the same iteration: either kept per position, or regathered from \(\bar x\).</li>
+  <li><b>The physics is in three places only:</b> \(P_j\) (positions), \(\mathcal{F}\) (far-field propagation), and \(D_k\) (the probe). Everything else is arithmetic on patches.</li>
+</ol>
+
+<h2>6. Parameter names in the API</h2>
+<table class="params">
+  <tr><th>API name</th><th>symbol</th><th>meaning</th></tr>
+  <tr><td><code>object_data_fit</code></td><td>\(\alpha_1\)</td><td>weight of the data-fitting step in the object update</td></tr>
+  <tr><td><code>probe_data_fit</code></td><td>\(\alpha_2\)</td><td>weight of the data-fitting step in the probe update</td></tr>
+  <tr><td><code>probe_weight_exponent</code></td><td>\(\kappa\)</td><td>exponent on the probe magnitude in the averaging weights</td></tr>
+  <tr><td><code>relaxation</code></td><td>\(\rho\)</td><td>Mann step</td></tr>
+  <tr><td><code>probe_modes</code></td><td>\(K\)</td><td>number of probe modes</td></tr>
+  <tr><td><code>mode_energy_fraction</code></td><td></td><td>fraction of the probe energy given to a newly added mode</td></tr>
+</table>
+<p>The defaults are the values of the 2025 paper: \(\rho = 0.5\), \(\kappa = 1.25\), \(\alpha_1 = 0.6\), \(\alpha_2 = 0.6\).</p>
+</div>
+</div>
