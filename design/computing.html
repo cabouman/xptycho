@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>xptycho Computing</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one reading column. A goal box, then one section per question, each opening with its goal and answering it with a table or a figure. Colors match the theory page. */
+:root {
+  --bg: #fbfaf7; --surface: #ffffff; --fg: #1f2328; --muted: #5f6670; --line: #d9d7d0;
+  --data: #b7791f;   --data-bg: #fdf3df;
+  --unk: #2b6cb0;    --unk-bg: #e3eefb;
+  --par: #2f855a;    --par-bg: #e2f3e8;
+  --state: #6b46c1;  --state-bg: #ece6f8;
+  --comp: #718096;   --comp-bg: #eef0f3;
+  --accent: #2b6cb0;
+  --sans: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+  --mono: "IBM Plex Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #15171b; --surface: #1d2025; --fg: #e6e4df; --muted: #a0a6ae; --line: #343a42;
+  --data: #e2b05a; --data-bg: #3a2f17; --unk: #7fb0ea; --unk-bg: #1b2d44; --par: #7cc99a; --par-bg: #163123;
+  --state: #b59cf0; --state-bg: #2a2140; --comp: #a7b0bd; --comp-bg: #262a30; --accent: #7fb0ea; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #15171b; --surface: #1d2025; --fg: #e6e4df; --muted: #a0a6ae; --line: #343a42;
+  --data: #e2b05a; --data-bg: #3a2f17; --unk: #7fb0ea; --unk-bg: #1b2d44; --par: #7cc99a; --par-bg: #163123;
+  --state: #b59cf0; --state-bg: #2a2140; --comp: #a7b0bd; --comp-bg: #262a30; --accent: #7fb0ea; color-scheme: dark }
+
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--sans); font-size: 16px; line-height: 1.55; }
+.wrap { max-width: 920px; margin: 0 auto; padding-inline: 16px; padding-block: 28px 64px; }
+.crumb { font-size: 13px; color: var(--muted); margin: 0 0 14px; }
+.crumb a { color: var(--accent); text-decoration: none; }
+h1 { font-size: 30px; font-weight: 700; margin: 0 0 8px; }
+h2 { font-size: 22px; font-weight: 700; margin: 40px 0 10px; }
+p { max-width: 72ch; margin: 0 0 10px; }
+code { font-family: var(--mono); font-size: 0.9em; }
+a { color: var(--accent); }
+.goal { border: 1.5px solid var(--accent); border-radius: 6px; background: var(--surface); padding: 12px 16px; margin: 12px 0 16px; max-width: 78ch; }
+.goal b.g { display: block; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); margin-bottom: 2px; }
+.goal p { margin: 0 0 6px; }
+.goal ol { margin: 4px 0 0; padding-left: 22px; }
+.sgoal { border-left: 4px solid var(--accent); background: var(--surface); padding: 8px 14px; margin: 0 0 14px; max-width: 76ch; }
+.sgoal b { font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); margin-right: 6px; }
+.rule { border-left: 4px solid var(--par); background: var(--surface); padding: 10px 16px; max-width: 76ch; margin: 14px 0; }
+.frame { overflow-x: auto; }
+table.t { border-collapse: collapse; margin: 12px 0; font-size: 14.5px; width: 100%; }
+table.t th, table.t td { border-bottom: 1px solid var(--line); padding: 6px 12px 6px 0; text-align: left; vertical-align: top; }
+table.t th { font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+table.t td.n { font-variant-numeric: tabular-nums; white-space: nowrap; }
+table.t td.c { text-align: center; }
+table.t tr.sep td { border-top: 2px solid var(--line); }
+.fig { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 10px; margin: 14px 0; }
+.fig svg { display: block; width: 100%; height: auto; min-width: 640px; font-family: var(--sans); }
+svg text { fill: var(--fg); }
+svg .mut { fill: var(--muted); }
+.ask { border-left: 4px solid var(--unk); background: var(--surface); padding: 12px 16px; max-width: 78ch; margin: 16px 0; }
+.ask ol { margin: 6px 0 0; padding-left: 22px; }
+.ask li { margin: 6px 0; }
+ul { max-width: 74ch; }
+li { margin: 4px 0; }
+.defs { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; margin: 10px 0; max-width: 78ch; font-size: 15px; }
+.defs b { white-space: nowrap; }
+</style>
+</head>
+<body>
+<div class="wrap">
+<p class="crumb"><a href="index.html">xptycho design</a> &rsaquo; Computing</p>
+<h1>Computing</h1>
+
+<div class="goal">
+  <b class="g">Goal of this page</b>
+  <p>The design for carrying out the <a href="theory.html">theory page</a>'s iteration on \(N_g\) GPUs of a single node, with all the data held in GPU memory. One GPU is the case \(N_g = 1\) of the same design. It is for the person writing or reviewing <code>recon</code>. It answers four questions:</p>
+  <ol>
+    <li>What does each GPU hold, and how large a scan fits?</li>
+    <li>What does each GPU compute, what moves between GPUs, and is the result the same as with one GPU?</li>
+    <li>What crosses between the host and the GPUs, and when?</li>
+    <li>What does the user set, and what is refused?</li>
+  </ol>
+</div>
+
+<div class="rule"><b>The principle.</b> Data goes to the GPUs once and stays there. Every large array is sharded: cut along one axis into contiguous pieces, one per GPU, as in mbirtorch. Small arrays are broadcast: a full copy on every GPU. The reason is the transfer rates: about 3,000 GB/s within an H100's own memory, hundreds of GB/s between GPUs over NVLink, and about 25 to 50 GB/s between host memory and a GPU.</div>
+
+<h2>1. What each GPU holds</h2>
+<div class="sgoal"><b>Goal</b>List the arrays, their sizes, and where each is kept; then say how large a scan fits.</div>
+<p>\(J\) is the number of scan positions, \(K\) the number of probe modes, \(N_p \times N_p\) the frame size, \(N\) the number of object pixels.</p>
+<div class="frame">
+<table class="t">
+  <tr><th>array</th><th>what it is</th><th>bytes</th><th>placement</th></tr>
+  <tr><td>\(y_j\)</td><td>measured amplitudes (float32)</td><td>\(4 N_p^2\) per position</td><td rowspan="3"><b>sharded by position.</b> Each GPU holds one <b>block</b> of positions. These arrays never move.</td></tr>
+  <tr><td>\(v_j\), \(w_j\)</td><td>the position's copy of its object patch, and its data-fit result</td><td>\(16 N_p^2\) per position</td></tr>
+  <tr><td>\(s_{j,k}\), \(r_{j,k}\)</td><td>the position's copy of each probe mode, and its data-fit result; only when the probe is estimated</td><td>\(16 K N_p^2\) per position</td></tr>
+  <tr class="sep"><td>\(\bar x\), the image sums, \(\Lambda_k\)</td><td>the object image, the sums over positions that build it, the coverage maps</td><td>a few times \(8N\) in total</td><td><b>sharded by image row.</b> Each GPU owns one <b>band</b> of rows, and also holds its <b>window</b>.</td></tr>
+  <tr class="sep"><td>\(d_k\), \(u_k\), the deviation, the position list</td><td>the probe modes and the other probe-sized arrays; the scan positions</td><td>small</td><td><b>broadcast.</b></td></tr>
+</table>
+</div>
+<div class="defs">
+  <b>block</b><span>The positions are sorted by the first row of their patch and cut into \(N_g\) blocks of nearly equal count. GPU \(g\) holds block \(g\).</span>
+  <b>band</b><span>The rows of the object image are cut into \(N_g\) bands of nearly equal height. GPU \(g\) owns band \(g\): it holds the one finished value of every pixel in it.</span>
+  <b>window</b><span>The range of image rows that the patches of a GPU's block touch. A GPU adds its patches into its window and cuts its patches from its window. A window usually reaches past the GPU's own band into its neighbors'.</span>
+</div>
+<div class="fig frame">
+<svg viewBox="0 0 900 250" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="An object image of 56 rows on three GPUs: three bands of rows, and the window of each GPU overlapping its neighbors' bands">
+  <g font-size="13">
+    <text x="20" y="18" font-weight="700">Example: 56 image rows, 6 scan lines of 16-row patches, 3 GPUs</text>
+    <text class="mut" x="20" y="46" font-size="12">row 0</text><text class="mut" x="14" y="232" font-size="12">row 55</text>
+    <rect x="70" y="34" width="250" height="68" fill="var(--unk-bg)" stroke="var(--unk)" stroke-width="1.5"/>
+    <text x="195" y="72" text-anchor="middle">band 0: rows 0–18</text>
+    <rect x="70" y="102" width="250" height="68" fill="var(--par-bg)" stroke="var(--par)" stroke-width="1.5"/>
+    <text x="195" y="140" text-anchor="middle">band 1: rows 19–37</text>
+    <rect x="70" y="170" width="250" height="64" fill="var(--state-bg)" stroke="var(--state)" stroke-width="1.5"/>
+    <text x="195" y="206" text-anchor="middle">band 2: rows 38–55</text>
+    <rect x="360" y="34" width="26" height="86" fill="var(--unk)" opacity="0.6"/>
+    <rect x="394" y="91" width="26" height="86" fill="var(--par)" opacity="0.6"/>
+    <rect x="428" y="148" width="26" height="86" fill="var(--state)" opacity="0.6"/>
+    <text x="480" y="62">window of GPU 0: rows 0–23</text>
+    <text class="mut" x="480" y="79" font-size="12">its band, and rows 19–23 of band 1</text>
+    <text x="480" y="128">window of GPU 1: rows 16–39</text>
+    <text class="mut" x="480" y="145" font-size="12">rows 16–18 of band 0, its band, and rows 38–39 of band 2</text>
+    <text x="480" y="196">window of GPU 2: rows 32–55</text>
+    <text class="mut" x="480" y="213" font-size="12">rows 32–37 of band 1, and its band</text>
+  </g>
+</svg>
+</div>
+<p>How many positions fit on one 80 GB GPU, leaving 10 GB for its band, its window, and temporary arrays:</p>
+<div class="frame">
+<table class="t" style="width:auto">
+  <tr><th>case</th><th>bytes per position</th><th>positions per GPU, \(N_p = 256\)</th><th>positions per GPU, \(N_p = 512\)</th></tr>
+  <tr><td>known probe</td><td>\(20 N_p^2\)</td><td class="n">53,000</td><td class="n">13,000</td></tr>
+  <tr><td>estimated probe, 1 mode</td><td>\(36 N_p^2\)</td><td class="n">29,000</td><td class="n">7,400</td></tr>
+  <tr><td>estimated probe, 2 modes</td><td>\(52 N_p^2\)</td><td class="n">20,000</td><td class="n">5,100</td></tr>
+</table>
+</div>
+<p>With \(N_g\) GPUs the capacity is \(N_g\) times these. The gold balls (794 positions, \(N_p = 512\), 2 modes) need 11 GB and fit on one GPU. Before anything is allocated, the memory each GPU needs, for the final number of modes, is compared with what that GPU has free; a run that does not fit is refused with the shortfall named.</p>
+
+<h2>2. One iteration on \(N_g\) GPUs</h2>
+<div class="sgoal"><b>Goal</b>Say what each GPU computes over its own positions and what moves between GPUs in each step; then say why the result matches one GPU.</div>
+<p>Each GPU computes over its own block and adds into a partial sum. Two operations then move data between GPUs. They are mbirtorch's, and every step uses them.</p>
+<div class="defs">
+  <b>sum to owner</b><span>Each GPU's partial sum is cut at the band boundaries and each piece is sent to the band's owner. The owner adds the pieces from all GPUs, in GPU order, and computes the result for its band.</span>
+  <b>copy to window</b><span>Each GPU copies the result for the rows of its window from the owners of those rows.</span>
+</div>
+<p>In the example above, GPU 0 sends its partial for rows 19–23 to GPU 1, and afterward copies the result for rows 19–23 back. A probe-sized array is the same with one owner, GPU 0, and a window that is the whole array.</p>
+<div class="frame">
+<table class="t">
+  <tr><th>step</th><th>each GPU, over its own positions</th><th>summed to owner</th><th>the owner computes, and windows copy</th></tr>
+  <tr><td>0. start<br>(once)</td><td>add \(\mathcal{F}^* y_j\) into a sum; \(\|y_j\|\) per position</td><td>one probe-sized sum; then the scaled constant patches and their count, as image sums</td><td>\(d^{(0)}\) and \(x^{(0)}\) as on the theory page, section 4; then \(v_j = P_j x^{(0)}\), \(s_{j,k} = d^{(0)}\), and \(\Lambda_k\)</td></tr>
+  <tr class="sep"><td>1. fit patches</td><td>\(w_j = F^I_j(v_j)\); add \(|d_k|^\kappa(2w_j - v_j)\) into an image sum per mode</td><td>\(K\) image sums</td><td>the average image of \(2\mathbf{w}-\mathbf{v}\)</td></tr>
+  <tr><td>2. update patches</td><td>\(v_j \leftarrow v_j + 2\rho(z_j - w_j)\), \(z_j\) the patch of that image; add \(|d_k|^\kappa v_j\) into an image sum per mode</td><td>\(K\) image sums</td><td>\(\bar x\), the reported image</td></tr>
+  <tr class="sep"><td>3. add a mode<br>(scheduled iterations)</td><td>the residual, back-transformed and divided by the patch of \(\bar x\); add into a sum</td><td>one probe-sized sum</td><td>the new mode and the rescale factor; each GPU then makes its own copies and rescales its own arrays</td></tr>
+  <tr><td>4. fit probe copies</td><td>\(r_{j,k} = F^P_{j,k}(s_{j,k})\), all modes, using the modes as they stand before this step; add \(2r_{j,k} - s_{j,k}\) into a sum per mode</td><td>\(K\) probe-sized sums</td><td>\(u_k\)</td></tr>
+  <tr><td>5. update probe copies</td><td>\(s_{j,k} \leftarrow s_{j,k} + 2\rho(u_k - r_{j,k})\); add \(s_{j,k}\) into a sum per mode. After the new modes return, add \(|d_k|^\kappa\) at each position into an image sum per mode</td><td>\(K\) probe-sized sums; then \(K\) image sums</td><td>the new modes \(d_k\); then the new \(\Lambda_k\)</td></tr>
+  <tr><td>6. replace outliers</td><td>add \(|s_{j,k} - d_k|\) into a sum per mode; after the result returns, set outlying pixels of \(s_{j,k}\) to \(d_k\)</td><td>\(K\) probe-sized sums</td><td>the deviation per pixel</td></tr>
+  <tr class="sep"><td>7. data error<br>(for the progress line)</td><td>forward-project the patches of \(\bar x\) with \(d_k\); add the squared difference from \(y_j\), and \(y_j^2\)</td><td>two numbers</td><td>the data error</td></tr>
+</table>
+</div>
+<p>Steps 3 to 6 run only when the probe is estimated. With a known probe, \(\Lambda_k\) is computed once in step 0. Within a GPU, a step processes its block in batches (about 1,000 positions at \(N_p = 256\) with 9 GB free) so that the temporary arrays of the Fourier transforms fit.</p>
+
+<p><b>Numbers that depend on all the positions or on the whole image.</b> Each is formed from sums over all the GPUs. Computing one per GPU or per batch gives a different result (an error near \(10^{-3}\) in a small test).</p>
+<div class="frame">
+<table class="t">
+  <tr><th>number</th><th>used in</th><th>how it is formed</th></tr>
+  <tr><td>\(\varepsilon\) of the division by \(\Lambda_k\)</td><td>steps 0, 1, 2</td><td>each owner adds \(|\Lambda_k|^2\) over its band; the sums are added and divided by \(N\), so every pixel of the grid is counted once</td></tr>
+  <tr><td>\(\varepsilon\) of the division by the patch</td><td>steps 3, 4</td><td>each GPU adds \(\|p_j\|^2\) over its positions, \(p_j\) the patch of \(\bar x\); the sums are added and divided by \(J N_p^2\); one number per iteration</td></tr>
+  <tr><td>every mean over positions (\(d^{(0)}\), a new mode, \(u_k\), \(d_k\), the deviation)</td><td>steps 0, 3, 4, 5, 6</td><td>the GPUs' sums are added and divided by \(J\); never an average of the GPUs' own means</td></tr>
+  <tr><td>the median of \(x^{(0)}\)</td><td>step 0</td><td>over the whole grid, pixels no patch reaches included; taken on the host (section 3)</td></tr>
+</table>
+</div>
+
+<p><b>Why the result matches one GPU.</b> Each position is on exactly one GPU and each image row has exactly one owner, so every sum receives every contribution once. The owner adds the pieces in GPU order, so every copy of a value is identical on all GPUs. What differs from a one-GPU run is the order of the additions inside the sums. How far that moves the result is measured by the tests (one device against two and three, with a block boundary inside a scan line) and stated there as a tolerance. It is not assumed.</p>
+
+<h2>3. What crosses between host and GPU</h2>
+<div class="sgoal"><b>Goal</b>List every transfer between host memory and the GPUs, with when it happens.</div>
+<div class="frame">
+<table class="t">
+  <tr><th>when</th><th>direction</th><th>what</th><th>gold balls</th></tr>
+  <tr><td>once, at the start</td><td>host to GPU</td><td>the frames of each GPU's block, as counts, converted to amplitudes on the GPU; the position list; a starting probe or object when one is given</td><td class="n">0.4 GB</td></tr>
+  <tr><td>once, in step 0</td><td>GPU to host and back</td><td>the bands of the starting image, for its median (numpy's definition); the median back</td><td class="n">3 MB</td></tr>
+  <tr><td>each iteration</td><td>GPU to host</td><td>a few numbers for the progress line</td><td class="n">bytes</td></tr>
+  <tr><td>once, at the end</td><td>GPU to host</td><td>the bands of \(\bar x\) and of the coverage, joined into one image; \(d_k\); any per-position output, put back in scan order</td><td class="n">about 10 MB</td></tr>
+</table>
+</div>
+<p>Nothing in the iteration waits on the host: no value is read back to decide what to do next.</p>
+
+<h2>4. What the user sets, and what is refused</h2>
+<div class="sgoal"><b>Goal</b>Say how the user chooses the GPUs, and name the cases <code>recon</code> refuses before it starts.</div>
+<p>The GPUs are chosen with one method of the model, <code>configure_devices</code>, taken from mbirtorch so that the two packages are used the same way.</p>
+<div class="frame">
+<table class="t">
+  <tr><th>call</th><th>what it does</th></tr>
+  <tr><td>no call</td><td>The model chooses automatically: every CUDA GPU on the node; if there is none, Apple's GPU (mps); if there is none, the CPU. The choice is printed.</td></tr>
+  <tr><td><code>model.configure_devices(num_devices=4)</code></td><td>Use 4 CUDA GPUs. \(N_g = 4\).</td></tr>
+  <tr><td><code>model.configure_devices(num_devices=1)</code></td><td>Use one device. This is the way to pin a run to one GPU so that it repeats exactly.</td></tr>
+  <tr><td><code>model.configure_devices(devices=['cuda:0', 'cuda:2'])</code></td><td>Use exactly these devices. <code>devices=['cpu']</code> runs on the CPU; a list of several CPU devices is how the tests exercise \(N_g &gt; 1\) on a machine with no GPU.</td></tr>
+</table>
+</div>
+<ul>
+  <li>The call is made before <code>recon</code>. Once made, the automatic choice is off for that model.</li>
+  <li>The result can differ in its last digits with the number of devices (section 2), so a run to be compared with another should pin its devices.</li>
+  <li>The batch size is not set here. It is chosen automatically; a model parameter overrides it.</li>
+  <li>Refused, with the reason named: more devices than positions; more devices asked for than the node has; an odd \(N_p\) (the old code cannot run it, so there is nothing to match); a patch that reaches outside the object grid; a run that does not fit in the devices' free memory.</li>
+</ul>
+<p>Decided by Charlie on 2026-10-03, after a panel review (<a href="panel-computing.html">its report</a>). Two changes are planned for after the new code matches the old: updating \(v_j\) and \(s_{j,k}\) in place, which removes \(w_j\) and \(r_{j,k}\) and fits 1.9 times as many positions per GPU; and computing each distinct Fourier transform once.</p>
+</div>
+<script>
+window.MathJax = { tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] }, svg: { fontCache: 'global' } };
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-svg.js"></script>
+</body>
+</html>

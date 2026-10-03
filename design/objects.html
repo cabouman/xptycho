@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>xptycho Objects and Data</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one reading column. The model is drawn once as a box with its three parameter groups and its methods; the two directions through it (simulation, reconstruction) are drawn as flows. Colors match the theory page. */
+:root {
+  --bg: #fbfaf7; --surface: #ffffff; --fg: #1f2328; --muted: #5f6670; --line: #d9d7d0;
+  --data: #b7791f;   --data-bg: #fdf3df;
+  --fm: #0b7285;     --fm-bg: #dff4f7;
+  --unk: #2b6cb0;    --unk-bg: #e3eefb;
+  --par: #2f855a;    --par-bg: #e2f3e8;
+  --state: #6b46c1;  --state-bg: #ece6f8;
+  --comp: #718096;   --comp-bg: #eef0f3;
+  --accent: #2b6cb0;
+  --sans: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+  --mono: "IBM Plex Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #15171b; --surface: #1d2025; --fg: #e6e4df; --muted: #a0a6ae; --line: #343a42;
+  --data: #e2b05a; --data-bg: #3a2f17; --fm: #5ec8d8; --fm-bg: #0f3238; --unk: #7fb0ea; --unk-bg: #1b2d44; --par: #7cc99a; --par-bg: #163123;
+  --state: #b59cf0; --state-bg: #2a2140; --comp: #a7b0bd; --comp-bg: #262a30; --accent: #7fb0ea; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #15171b; --surface: #1d2025; --fg: #e6e4df; --muted: #a0a6ae; --line: #343a42;
+  --data: #e2b05a; --data-bg: #3a2f17; --fm: #5ec8d8; --fm-bg: #0f3238; --unk: #7fb0ea; --unk-bg: #1b2d44; --par: #7cc99a; --par-bg: #163123;
+  --state: #b59cf0; --state-bg: #2a2140; --comp: #a7b0bd; --comp-bg: #262a30; --accent: #7fb0ea; color-scheme: dark }
+
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--sans); font-size: 16px; line-height: 1.55; }
+.wrap { max-width: 920px; margin: 0 auto; padding-inline: 16px; padding-block: 28px 64px; }
+.crumb { font-size: 13px; color: var(--muted); margin: 0 0 14px; }
+.crumb a { color: var(--accent); text-decoration: none; }
+h1 { font-size: 30px; font-weight: 700; margin: 0 0 4px; text-wrap: balance; }
+h2 { font-size: 22px; font-weight: 700; margin: 44px 0 10px; text-wrap: balance; }
+h3 { font-size: 17px; font-weight: 700; margin: 22px 0 6px; }
+p { max-width: 70ch; margin: 0 0 10px; }
+.lead { color: var(--muted); font-size: 17px; }
+code { font-family: var(--mono); font-size: 0.9em; }
+a { color: var(--accent); }
+
+.chip { display: inline-block; font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 10px; border: 1px solid; white-space: nowrap; }
+.chip.data { color: var(--data); border-color: var(--data); background: var(--data-bg); }
+.chip.fm { color: var(--fm); border-color: var(--fm); background: var(--fm-bg); }
+.chip.unk { color: var(--unk); border-color: var(--unk); background: var(--unk-bg); }
+.chip.par { color: var(--par); border-color: var(--par); background: var(--par-bg); }
+.chip.state { color: var(--state); border-color: var(--state); background: var(--state-bg); }
+.chip.comp { color: var(--comp); border-color: var(--comp); background: var(--comp-bg); }
+
+/* the three things a user holds */
+.three { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin: 14px 0; align-items: start; }
+.thing { background: var(--surface); border: 1px solid var(--line); border-top: 4px solid; border-radius: 6px; padding: 12px 16px 14px; min-width: 0; }
+.thing h3 { margin: 0 0 2px; }
+.thing .what { color: var(--muted); font-size: 13.5px; margin-bottom: 8px; }
+.thing ul { margin: 0; padding-left: 18px; font-size: 14.5px; }
+.thing li { margin: 3px 0; }
+.t-data { border-top-color: var(--data); } .t-model { border-top-color: var(--fm); } .t-unk { border-top-color: var(--unk); }
+
+/* the model drawn once */
+.model { background: var(--surface); border: 2px solid var(--fm); border-radius: 8px; padding: 14px 18px 16px; margin: 16px 0; }
+.model > h3 { margin: 0 0 10px; font-family: var(--mono); font-size: 20px; }
+.groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.group { border: 1.5px solid; border-radius: 6px; padding: 8px 12px; min-width: 0; }
+.group h4 { margin: 0 0 4px; font-size: 14px; }
+.group .how { font-size: 12.5px; color: var(--muted); margin-bottom: 6px; }
+.group ul { margin: 0; padding-left: 16px; font-size: 13.5px; line-height: 1.4; }
+.group li { margin: 1px 0; }
+.g-fm { border-color: var(--fm); background: var(--fm-bg); } .g-par { border-color: var(--par); background: var(--par-bg); } .g-comp { border-color: var(--comp); background: var(--comp-bg); }
+.derived { font-size: 13.5px; color: var(--muted); margin: 10px 0 0; }
+.methods { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 8px; }
+.methods h4 { margin: 0 0 6px; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.meths { display: grid; gap: 0; }
+.meth { padding: 5px 0; border-bottom: 1px solid var(--line); font-size: 14px; line-height: 1.45; }
+.meth:last-child { border-bottom: none; }
+.meth > code { display: block; font-size: 13px; font-weight: 600; margin-bottom: 1px; }
+.meth > code em { font-style: normal; font-weight: 400; color: var(--muted); font-family: var(--sans); font-size: 12px; margin-left: 8px; }
+.meth > span { display: block; max-width: 90ch; }
+.frame { overflow-x: auto; }
+
+/* the two directions */
+.flows { display: grid; gap: 12px; margin: 14px 0; }
+.flow { display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; gap: 8px; align-items: center; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; }
+.flow .lab { grid-column: 1 / -1; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.flow .node { border: 1.5px solid; border-radius: 6px; padding: 8px 10px; font-size: 13.5px; text-align: center; min-width: 0; }
+.flow .node b { display: block; font-family: var(--mono); font-size: 13.5px; }
+.flow .n-unk { border-color: var(--unk); background: var(--unk-bg); } .flow .n-fm { border-color: var(--fm); background: var(--fm-bg); } .flow .n-data { border-color: var(--data); background: var(--data-bg); }
+.flow .arr { color: var(--muted); font-size: 22px; text-align: center; }
+@media (max-width: 560px) { .flow { grid-template-columns: 1fr; } .flow .arr { transform: rotate(90deg); } }
+
+pre { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 10px 14px; font-family: var(--mono); font-size: 13px; line-height: 1.55; overflow-x: auto; margin: 10px 0; }
+pre .c { color: var(--muted); }
+
+table.where { border-collapse: collapse; margin: 12px 0; font-size: 14.5px; }
+table.where th, table.where td { border-bottom: 1px solid var(--line); padding: 7px 14px 7px 0; text-align: left; vertical-align: top; }
+table.where th { font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+
+.ask { border-left: 4px solid var(--unk); background: var(--surface); padding: 12px 16px; max-width: 78ch; margin: 16px 0; }
+.ask ol { margin: 6px 0 0; padding-left: 22px; }
+.ask li { margin: 6px 0; }
+.rec { border-left: 4px solid var(--par); background: var(--surface); padding: 10px 16px; max-width: 78ch; margin: 16px 0; font-size: 15px; }
+.alt { font-size: 14.5px; max-width: 78ch; }
+.alt ul { padding-left: 20px; }
+.alt li { margin: 5px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+<p class="crumb"><a href="index.html">xptycho design</a> &rsaquo; Objects and data</p>
+<h1>Objects and Data</h1>
+<p class="lead">How the five kinds of quantities from the <a href="theory.html">theory page</a> map onto objects. The layout is the mbirtorch pattern, chosen by Charlie on 2026-10-03 after Claude and Vera reached it independently: one model holds the parameters and the forward model, and the unknowns pass through it as arguments and results. <code>recon</code> returns a <code>Reconstruction</code>: the two unknowns with the record of the run. Position refinement is a method the user calls (section 6). Two points remain open (section 7).</p>
+
+<h2>1. The three things a user holds</h2>
+<div class="three">
+  <div class="thing t-data">
+    <h3><code>Scan</code></h3>
+    <div class="what">The measurement. Never modified.</div>
+    <ul>
+      <li><span class="chip data">data</span> the frames \(y_j\), in memory or read from a file in batches.</li>
+      <li><span class="chip fm">facts from the file</span> positions, wavelength, distance, detector pixel, as recorded. Read once, to build a model.</li>
+      <li>Made by <code>Scan.load(path)</code>, by <code>model.simulate</code>, or by preprocessing raw frames.</li>
+    </ul>
+  </div>
+  <div class="thing t-model">
+    <h3><code>PtychoModel</code></h3>
+    <div class="what">The parameters and the forward model. Holds no image and no probe.</div>
+    <ul>
+      <li><span class="chip fm">fmodel_params</span> fixed when the model is built.</li>
+      <li><span class="chip par">recon_params</span> and <span class="chip comp">compute_params</span> set and read by name.</li>
+      <li>Computes the forward model, simulates data, and reconstructs. Drawn in full below.</li>
+    </ul>
+  </div>
+  <div class="thing t-unk">
+    <h3>The unknowns, and <code>Reconstruction</code></h3>
+    <div class="what">The unknowns go in as arguments. They come back inside a <code>Reconstruction</code>.</div>
+    <ul>
+      <li><span class="chip unk">unknowns</span> the object image \(x\), complex, on the object grid; the probe modes \(d\), complex \((K, N_p, N_p)\). Given to <code>forward</code> and <code>simulate</code>; given to <code>recon</code> when known.</li>
+      <li><code>recon</code> returns a <code>Reconstruction</code> holding both unknowns (<code>object</code>, <code>probe</code>) and the record of the run: the parameter table the run used, the pixel size, origin, and coverage needed to read the image, and the data-error curve. Drawn in section 3.</li>
+      <li>It saves itself to a folder and loads back, so a cluster job's output is one thing.</li>
+    </ul>
+  </div>
+</div>
+<p>The <span class="chip state">run state</span> is the fourth kind and nobody holds it: it exists inside <code>recon</code> and is gone when <code>recon</code> returns.</p>
+
+<h2>2. The model, in full</h2>
+<div class="model">
+  <h3>PtychoModel</h3>
+  <div class="groups">
+    <div class="group g-fm">
+      <h4>Forward-model parameters</h4>
+      <div class="how">Given to the constructor, or read from a scan by <code>from_scan</code>. Fixed for the life of the model.</div>
+      <ul>
+        <li>wavelength (or energy)</li>
+        <li>object-to-detector distance</li>
+        <li>detector pixel pitch</li>
+        <li>frame size \(N_p\)</li>
+        <li>scan positions, in meters</li>
+        <li>\(K\), the number of probe modes</li>
+      </ul>
+    </div>
+    <div class="group g-par">
+      <h4>Reconstruction parameters</h4>
+      <div class="how"><code>set_params(...)</code> and <code>get_params(...)</code>, by name. Defaults from the 2025 paper and the old code.</div>
+      <ul>
+        <li><code>object_data_fit</code> \(\alpha_1\), <code>probe_data_fit</code> \(\alpha_2\)</li>
+        <li><code>probe_weight_exponent</code> \(\kappa\), <code>relaxation</code> \(\rho\)</li>
+        <li><code>mode_schedule</code>, <code>mode_energy_fraction</code></li>
+        <li><code>initial_probe_distance</code></li>
+        <li>object grid shape (must hold every patch)</li>
+      </ul>
+    </div>
+    <div class="group g-comp">
+      <h4>Compute settings</h4>
+      <div class="how"><code>configure_devices(...)</code>. Change where the arithmetic runs, never the answer.</div>
+      <ul>
+        <li>the devices: a count, or a list</li>
+        <li>the batch size (automatic unless set)</li>
+      </ul>
+    </div>
+  </div>
+  <p class="derived">Derived from the forward-model parameters, read-only: the object pixel size \(\lambda L / (N_p \Delta_{\mathrm{det}})\), the positions in pixels, the object grid shape and origin, the patch operators \(P_j\).</p>
+  <div class="methods">
+    <h4>Methods</h4>
+    <p style="font-size:13px;color:var(--muted);margin:0 0 6px">Written as a user calls them: <code>PtychoModel(…)</code> builds one, and <code>model.name(…)</code> is a method of the instance <code>model</code>. The one classmethod is marked.</p>
+    <div class="frame">
+    <div class="meths">
+      <div class="meth"><code>PtychoModel(…) <em>constructor</em></code><span>Build from the forward-model parameters.</span></div>
+      <div class="meth"><code>PtychoModel.from_scan(scan, probe_modes=1, **overrides) <em>classmethod</em></code><span>Build from the facts a scan file recorded. Any parameter passed overrides the file's value.</span></div>
+      <div class="meth"><code>model.set_params(**p), model.get_params(names)</code><span>Set and read reconstruction parameters and compute settings by name, as in mbirtorch.</span></div>
+      <div class="meth"><code>model.configure_devices(num_devices=1, devices=None)</code><span>Choose the devices, as in mbirtorch: a count of GPUs, or an explicit list. Without a call the model chooses automatically. See <a href="computing.html">Computing</a>, section 4.</span></div>
+      <div class="meth"><code>model.print_params()</code><span>Print every parameter with its value, units, and origin (given, file, derived, default).</span></div>
+      <div class="meth"><code>model.forward(x, d)</code><span><b>The forward model.</b> For every scan position: cut the patch out of <code>x</code>, multiply by each probe mode, far-field transform, sum the modes in intensity. Returns the noiseless amplitudes \(y_j\), shape \((J, N_p, N_p)\). Stores nothing.</span></div>
+      <div class="meth"><code>model.simulate(x, d, pixel_size=None, peak_photons=None, dark_rate=0, seed=0)</code><span>Calls <code>forward</code>, after checking that <code>pixel_size</code>, when given, equals the model's object pixel size, scales the intensities so the brightest sample is <code>peak_photons</code>, draws Poisson counts, and returns a <code>Scan</code> carrying this model's positions and instrument facts. Without <code>peak_photons</code>, the exact intensities.</span></div>
+      <div class="meth"><code>model.recon(scan, probe=None, init_probe=None, init=None, iterations=…)</code><span><b>The reconstruction.</b> With <code>probe=</code>, the probe is known and held fixed. Without it, the probe is estimated: from <code>init_probe=</code> when given, else from the data-driven initialization. A given <code>probe=</code> must have all \(K\) modes. An estimate may start with fewer: one mode from the initialization, or however many <code>init_probe=</code> has, and reaches \(K\) by adding a mode at each iteration of <code>mode_schedule</code> (theory page, section 5). The schedule must have enough entries to reach \(K\), or <code>recon</code> refuses before it starts. <code>init=</code> warm-starts both unknowns from a previous <code>Reconstruction</code>. <code>iterations</code> is the one setting that changes on every call, so it is an argument here, as mbirtorch's <code>max_iterations</code> is. Returns a <code>Reconstruction</code>. The run state lives only inside this call.</span></div>
+      <div class="meth"><code>model.data_error(scan, x, d)</code><span>The normalized distance between <code>forward(x, d)</code> and the scan's amplitudes. The curve <code>recon</code> reports, available on its own.</span></div>
+      <div class="meth"><code>model.refine_positions(scan, x, d, max_shift=1)</code><span>One refinement pass: for each position, the integer shift within <code>max_shift</code> whose <code>forward</code> best matches the data, given <code>x</code> and <code>d</code>. Returns the refined positions and the per-position misfit. Changes nothing. Section 6.</span></div>
+      <div class="meth"><code>model.initial_probe(scan), model.initial_object(scan, d)</code><span>The two initialization formulas of the theory page, exposed so a user can look at the starting point. <code>recon</code> calls them when nothing is given.</span></div>
+    </div>
+    </div>
+  </div>
+</div>
+
+<h2>3. Two directions through one model</h2>
+<p>The forward model is written once, in <code>forward</code>. Everything else that needs it calls it.</p>
+<div class="flows">
+  <div class="flow">
+    <span class="lab">simulation: known \(x\) and \(d\) in, data out</span>
+    <div class="node n-unk"><b>x, d</b>a known object and probe</div>
+    <div class="arr">&rarr;</div>
+    <div class="node n-fm"><b>model.simulate(x, d, …)</b>forward, then Poisson counts</div>
+    <div class="arr">&rarr;</div>
+    <div class="node n-data"><b>Scan</b>frames, positions, facts</div>
+  </div>
+  <div class="flow">
+    <span class="lab">reconstruction: data in, \(x\) (and \(d\)) out</span>
+    <div class="node n-data"><b>Scan</b>frames, positions, facts</div>
+    <div class="arr">&rarr;</div>
+    <div class="node n-fm"><b>model.recon(scan, probe=…)</b>PMACE; the run state lives here</div>
+    <div class="arr">&rarr;</div>
+    <div class="node n-unk"><b>Reconstruction</b>x̂, d̂, and the record of the run</div>
+  </div>
+</div>
+<p>Two more uses share the same <code>forward</code>: <code>data_error</code>, and <code>refine_positions</code>, which compares <code>forward</code> at shifted positions against the data. A continued run is another <code>recon</code> call on the same model with <code>init=</code> the previous <code>Reconstruction</code>.</p>
+
+<h3>What <code>recon</code> returns</h3>
+<p>A <code>Reconstruction</code> holds two things and nothing else: the unknowns, and a record of the run. The record is not a new kind of quantity; it is copies and derived values of what the model holds, frozen at the time of the run. Nothing of the run state and nothing of the measured data comes back.</p>
+<div class="model" style="border-color: var(--unk)">
+  <h3>Reconstruction</h3>
+  <div class="groups">
+    <div class="group" style="border-color: var(--unk); background: var(--unk-bg)">
+      <h4>The unknowns</h4>
+      <div class="how">Estimated, or given to <code>recon</code> and passed back, so the object is complete on its own.</div>
+      <ul>
+        <li><code>object</code>: \(\hat x\), complex, on the object grid</li>
+        <li><code>probe</code>: \(\hat d\), complex \((K, N_p, N_p)\)</li>
+      </ul>
+    </div>
+    <div class="group g-fm">
+      <h4>To read the image</h4>
+      <div class="how">Derived from the forward-model parameters and the probe.</div>
+      <ul>
+        <li><code>pixel_size</code>, <code>origin</code>: where the grid sits, in meters</li>
+        <li><code>coverage</code>: the accumulated probe weight; zero where no probe reached</li>
+        <li><code>mode_energies</code>: the share of the probe energy in each mode</li>
+        <li><code>positions</code>: the positions the run used</li>
+      </ul>
+    </div>
+    <div class="group g-par">
+      <h4>The record of the run</h4>
+      <div class="how">What <code>model.print_params()</code> showed, plus what happened.</div>
+      <ul>
+        <li><code>params</code>: fmodel_params, recon_params, compute_params, each with its origin</li>
+        <li><code>curves</code>: the data error per iteration; object and probe error when a truth is given</li>
+        <li>iterations run, time, devices</li>
+      </ul>
+    </div>
+  </div>
+  <div class="methods">
+    <h4>Methods</h4>
+    <div class="meths">
+      <div class="meth"><code>recon.summary()</code><span>The parameter table as text, then the iteration count, the final errors, the time, and the devices.</span></div>
+      <div class="meth"><code>recon.show(directory=None, compare_to=None)</code><span>Magnitude and phase of the object over the coverage, the probe modes with their energy fractions, and the curves. With a truth, the error images and the NRMSE.</span></div>
+      <div class="meth"><code>recon.save(directory)</code><span>One folder: <code>summary.txt</code>, <code>parameters.csv</code>, <code>recon.h5</code> (object, probe, positions, coverage, curves, with pixel size and origin as attributes), preview images, <code>plots/</code>. <code>recon.h5</code> is the file a laminography reconstruction reads.</span></div>
+      <div class="meth"><code>Reconstruction.load(directory) <em>classmethod</em></code><span>Read a folder written by <code>save</code>.</span></div>
+    </div>
+  </div>
+</div>
+
+<h3>How the probe reaches \(K\) modes</h3>
+<p>Mode addition is inside <code>recon</code>. The user sets the target and the timing: \(K\) on the model (<code>probe_modes=2</code>) is how many modes the run ends with; <code>mode_schedule=[20]</code> is the iterations at which a mode is added; <code>mode_energy_fraction</code> is the energy a new mode starts with. <code>recon</code> starts with one mode (or the modes in <code>init_probe=</code>) and at each scheduled iteration runs the six steps of theory section 5. The user sees it in three places: the progress line printed at that iteration ("iteration 20: mode 2 added, 5% of the energy"); <code>recon.curves</code>, which carries a probe-error curve per mode when a truth is given; and the result, <code>recon.probe</code> of shape \((K, N_p, N_p)\) with <code>recon.mode_energies</code>, the final share of each mode.</p>
+
+<h2>4. The scripts</h2>
+<pre><span class="c"># 1. simulated scan, known probe (TCI 2023, Fig. 6)</span>
+truth = xptycho.demo_truth('synthetic')                            <span class="c"># truth.object, truth.probe, truth.pixel_size</span>
+model = xptycho.PtychoModel(energy=8.8, detector_distance=L, detector_pixel=p,
+                            frame_size=256, positions=pos, probe_modes=1)
+scan = model.simulate(truth.object, truth.probe, pixel_size=truth.pixel_size, peak_photons=1e4, seed=0)
+model.set_params(object_data_fit=0.6, probe_weight_exponent=1.25, relaxation=0.5)
+model.print_params()
+recon = model.recon(scan, probe=truth.probe, iterations=100)      <span class="c"># probe given, held fixed</span>
+print(xptycho.nrmse(recon.object, truth.object))
+recon.show(OUTPUT_DIR, compare_to=truth); recon.save(OUTPUT_DIR)
+
+<span class="c"># 2. measured scan, blind, two modes (TCI 2025)</span>
+scan = xptycho.Scan.load('gold_balls.h5')
+model = xptycho.PtychoModel.from_scan(scan, probe_modes=2)         <span class="c"># fmodel_params from the file</span>
+model.set_params(object_data_fit=0.5, probe_data_fit=0.6, mode_schedule=[20],
+                 initial_probe_distance=0.3e-6)
+model.configure_devices(num_devices=4, batch_size=512)
+recon = model.recon(scan, iterations=200)                         <span class="c"># probe not given, so estimated</span>
+recon.probe                                                       <span class="c"># (2, h, w)</span>
+recon = model.recon(scan, init=recon, iterations=100)             <span class="c"># continue from the previous result</span>
+recon.save(OUTPUT_DIR)</pre>
+
+<h2>5. Where each kind lives</h2>
+<table class="where">
+  <tr><th>kind</th><th>lives in</th></tr>
+  <tr><td><span class="chip data">measured data</span></td><td><code>Scan</code></td></tr>
+  <tr><td><span class="chip fm">fmodel_params</span></td><td><code>PtychoModel</code>, fixed at construction; a copy of the recorded ones in <code>Scan</code></td></tr>
+  <tr><td><span class="chip unk">unknowns</span></td><td>arguments of <code>forward</code>, <code>simulate</code>, <code>recon</code>; returned inside a <code>Reconstruction</code></td></tr>
+  <tr><td><span class="chip par">recon_params</span></td><td><code>PtychoModel</code>, <code>set_params</code></td></tr>
+  <tr><td><span class="chip comp">compute_params</span></td><td><code>PtychoModel</code>, <code>configure_devices</code></td></tr>
+  <tr><td><span class="chip state">run state</span></td><td>inside <code>recon</code></td></tr>
+</table>
+
+<div class="rec"><b>Why the unknowns are not in the model.</b> The same probe is fixed in one run and estimated in the next; an argument states which, an attribute cannot. The object's size depends on the object grid, a reconstruction parameter, so it cannot exist when the model is built. And the image goes straight to mbirtorch, whose users already write <code>image = model.recon(data)</code>.</div>
+
+<h2>6. Position refinement</h2>
+<p>Positions are a forward-model parameter, read from the scan file, and in most runs they are accurate enough to leave alone. Sometimes they are not, and the user usually knows which from the instrument. So refinement is a method the user calls, never something <code>recon</code> does on its own.</p>
+<p>The method is Qiuchen's: for each position, try every integer shift within <code>max_shift</code>, run <code>forward</code> at each against the current object and probe, and keep the shift that best matches the measurement. It trusts the current image, so it is called after some iterations, and it costs 9 to 25 forward projections per position per pass.</p>
+<pre>recon = model.recon(scan, iterations=50)
+new_pos, misfit = model.refine_positions(scan, recon.object, recon.probe, max_shift=1)
+model.set_params(positions=new_pos)                       <span class="c"># accept the refined positions</span>
+recon = model.recon(scan, init=recon, iterations=150)     <span class="c"># continue with them</span></pre>
+<ul style="max-width:76ch;font-size:15px">
+  <li><code>refine_positions</code> changes nothing. It returns the refined positions and, per position, how much better the best shift fits than the current one. A user who sees nothing to gain leaves the positions alone.</li>
+  <li>The user accepts a change with <code>set_params(positions=...)</code>. The scan keeps the recorded positions, so the correction is always visible as the difference.</li>
+  <li>Several rounds are several <code>recon</code> calls, each a warm start from the previous <code>Reconstruction</code>.</li>
+</ul>
+
+<h2>7. Open points</h2>
+<p>Decided 2026-10-03: <code>recon</code> returns a <code>Reconstruction</code> (section 3); <code>iterations</code> is an argument of <code>recon</code>.</p>
+<div class="ask">
+  <ol>
+    <li><b>Continuing a run.</b> <code>init=recon</code> rebuilds the per-position copies from the averages, so a continued run is not identical to one uninterrupted run of the same length. Acceptable for a warm start.</li>
+    <li><b>Laminography series.</b> One model per scan, since the positions differ per tilt, or one model holding all of them.</li>
+  </ol>
+</div>
+
+</div>
+<script>
+window.MathJax = { tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] }, svg: { fontCache: 'global' } };
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-svg.js"></script>
+</body>
+</html>

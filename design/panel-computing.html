@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>xptycho Computing Panel</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one reading column. The recommendation first, then the questions for Charlie, then the evidence. */
+:root {
+  --bg: #fbfaf7; --surface: #ffffff; --fg: #1f2328; --muted: #5f6670; --line: #d9d7d0;
+  --unk: #2b6cb0; --par: #2f855a; --accent: #2b6cb0;
+  --sans: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+  --mono: "IBM Plex Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #15171b; --surface: #1d2025; --fg: #e6e4df; --muted: #a0a6ae; --line: #343a42; --unk: #7fb0ea; --par: #7cc99a; --accent: #7fb0ea; color-scheme: dark } }
+:root[data-theme="dark"] { --bg: #15171b; --surface: #1d2025; --fg: #e6e4df; --muted: #a0a6ae; --line: #343a42; --unk: #7fb0ea; --par: #7cc99a; --accent: #7fb0ea; color-scheme: dark }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--sans); font-size: 16px; line-height: 1.55; }
+.wrap { max-width: 900px; margin: 0 auto; padding-inline: 16px; padding-block: 28px 64px; }
+.crumb { font-size: 13px; color: var(--muted); margin: 0 0 14px; }
+.crumb a { color: var(--accent); text-decoration: none; }
+h1 { font-size: 30px; font-weight: 700; margin: 0 0 8px; }
+h2 { font-size: 22px; font-weight: 700; margin: 38px 0 10px; }
+p { max-width: 72ch; margin: 0 0 10px; }
+code { font-family: var(--mono); font-size: 0.9em; }
+a { color: var(--accent); }
+.rec { border: 1.5px solid var(--par); border-radius: 6px; background: var(--surface); padding: 12px 16px; margin: 12px 0 16px; max-width: 78ch; }
+.rec b.g { display: block; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--par); margin-bottom: 2px; }
+.rec p { margin: 0 0 6px; }
+.q { border-left: 4px solid var(--unk); background: var(--surface); padding: 10px 16px; max-width: 78ch; margin: 12px 0; }
+.q b.n { color: var(--unk); margin-right: 6px; }
+.q .ans { color: var(--muted); font-size: 14.5px; margin-top: 4px; }
+.frame { overflow-x: auto; }
+table.t { border-collapse: collapse; margin: 12px 0; font-size: 14.5px; width: 100%; }
+table.t th, table.t td { border-bottom: 1px solid var(--line); padding: 6px 12px 6px 0; text-align: left; vertical-align: top; }
+table.t th { font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+table.t td.n { font-variant-numeric: tabular-nums; white-space: nowrap; }
+</style>
+</head>
+<body>
+<div class="wrap">
+<p class="crumb"><a href="index.html">xptycho design</a> &rsaquo; Computing panel</p>
+<h1>Computing: the panel's recommendation</h1>
+
+<div class="rec">
+  <b class="g">Recommendation</b>
+  <p>Build the design now on the <a href="computing.html">computing page</a>. Every large array is sharded: the per-position arrays by position, the object image by row into bands with one owner each. Each GPU adds its patches into the rows they touch (its window), the pieces go to the bands' owners to be summed, and each GPU copies back the finished rows it needs. These are mbirtorch's two operations, and they serve every step. A reviewer walked an iteration on three GPUs by hand and found every pixel receives every contribution exactly once; a small numerical test agrees to \(7 \times 10^{-16}\) in double precision.</p>
+  <p>Six Opus members reviewed the earlier page independently on 2026-10-03; Vera and a seventh, fresh reviewer then attacked the draft of this recommendation. The comparison of the two ways to shard the image that the panel raised is drawn on the <a href="bands-or-windows.html">bands or windows</a> page.</p>
+</div>
+
+<div class="rec"><b class="g">Decided by Charlie, 2026-10-03</b>
+  <p>1: bands with owners. 2: the grid correction stands. 3: the baseline runs wait until the tests are written. 4: yes, after the match. 5: yes; <code>configure_devices</code> is documented on the computing page, section 4.</p></div>
+<h2>The five questions, as asked</h2>
+<div class="q"><b class="n">1.</b><b>Bands with owners, or windows only?</b> The page uses bands with owners, which is mbirtorch's pattern. Vera proposes a simpler form: no bands; each GPU keeps only its window, and GPUs whose windows overlap exchange and add the overlapping rows.
+  <div class="ans">Windows only: one image operation instead of two, less image memory per GPU, and only overlapping rows move. But it needs a rule for sums over the whole image (which GPU counts a shared row), and it departs from mbirtorch. <b>Claude recommends bands with owners:</b> one owner per pixel makes the whole-image sums and the final image need no extra rule, it was the form checked by hand, and it is what an mbirtorch reader already knows. Exchange is under 0.1% of an iteration either way.</div></div>
+<div class="q"><b class="n">2.</b><b>The object grid.</b> The theory page said the grid is the union of the patches. In the old code the grid is a given size and includes pixels no patch reaches (gold balls: 613 rows, patches cover rows 10 to 566). Those pixels enter the starting image's median and one of the small constants, so matching the old code requires the old grid.
+  <div class="ans">I corrected the theory and objects pages. Confirm.</div></div>
+<div class="q"><b class="n">3.</b><b>Authorize four runs of the old code?</b> The tests need baselines that do not exist yet: the blind two-mode run on the paper's data (its 467 MB download was paused on 2026-09-27), a tiny blind two-mode case, the first three iterates of the blind single-mode run, and the tiny baseline repeated in double precision, which measures how far single-precision results can be expected to differ.
+  <div class="ans">All run on the Mac in the old code's environment, a few minutes each except the first. Nothing runs without your yes.</div></div>
+<div class="q"><b class="n">4.</b><b>After the new code matches the old: adopt two changes?</b> Update \(v\) and the probe copies in place, which drops the \(w\) and \(r\) arrays and fits 1.9 times as many positions per GPU. And compute each distinct Fourier transform once: the old code takes 18 per position per iteration with two modes, where 12 are needed.
+  <div class="ans">Both are the same algebra and change only the last digits. The panel is unanimous: yes, but only after the match.</div></div>
+<div class="q"><b class="n">5.</b><b>Match mbirtorch's settings?</b> <code>configure_devices(num_devices=1, devices=None)</code> as in mbirtorch, with the batch size as a model parameter instead of an argument there.
+  <div class="ans">This changes one line of the objects page. Recommended.</div></div>
+
+<h2>What changed on the computing page</h2>
+<div class="frame">
+<table class="t">
+  <tr><th>finding</th><th>found by</th><th>change</th></tr>
+  <tr><td>The one-neighbor edge exchange failed whenever a band was thinner than a patch (gold balls on 2 GPUs) and when a block boundary fell inside a scan line.</td><td>four members independently; confirmed numerically</td><td>Replaced by sum to owner and copy to window, which have no such limit.</td></tr>
+  <tr><td>The small constant in every stable division is computed from a whole array, not per GPU or per batch. A per-band value gave an error of \(7 \times 10^{-4}\).</td><td>correctness, performance, verification</td><td>A table of the numbers that depend on all positions or the whole image, each with how it is formed.</td></tr>
+  <tr><td>Every mean over positions must divide the summed totals by \(J\). Averaging the GPUs' own means gave an error of \(2.5 \times 10^{-2}\).</td><td>correctness</td><td>In the same table.</td></tr>
+  <tr><td>Initialization was not on the page. It needs a median over the whole image, in numpy's definition.</td><td>correctness, both reviewers</td><td>Step 0 added. The median is taken on the host, once.</td></tr>
+  <tr><td>Adding a mode mid-run could exhaust memory.</td><td>verification</td><td>Memory is checked and allocated for the final number of modes.</td></tr>
+  <tr><td>"Only the last digits differ" was an assumption. The outlier test is a threshold that a last-bit difference can flip.</td><td>correctness, verification</td><td>The page now says the agreement is measured by the tests.</td></tr>
+  <tr><td>The page used terms before defining them and had two kinds of exchange.</td><td>simplicity</td><td>Three terms defined once (block, band, window); two operations for every step.</td></tr>
+</table>
+</div>
+<p>Three members recommended a full copy of the image on every GPU, as the simplest design at the sizes in their brief. That is ruled out by your rule that every large array is sharded, and it is not on the page.</p>
+
+<h2>Expected speed</h2>
+<p>Estimates from the performance member's cost model; nothing was run on a GPU. The cost is arithmetic on the per-position arrays; exchange between GPUs is under 0.1%.</p>
+<div class="frame">
+<table class="t" style="width:auto">
+  <tr><th>case, two modes</th><th>as the old code computes</th><th>with question 4's changes</th></tr>
+  <tr><td>gold balls, 1 GPU</td><td class="n">about 190 ms per iteration</td><td class="n">about 115 ms</td></tr>
+  <tr><td>40,000 positions, \(N_p = 256\), 4 GPUs</td><td class="n">about 610 ms</td><td class="n">about 360 ms</td></tr>
+  <tr><td>the same, 8 GPUs</td><td class="n">about 305 ms</td><td class="n">about 180 ms</td></tr>
+</table>
+</div>
+<p>For comparison, the old code takes about 18 s per iteration on the gold balls with a known probe on the Mac.</p>
+
+<h2>Tests the panel proposes</h2>
+<p>Three fast tests on CPU and one script for a GPU node: the tiny baseline on one device against the old code; two and three devices against one, with a block boundary inside a scan line; a tiny blind two-mode case; and, on a GPU node, the gold balls on 1, 2, and 4 GPUs, with a check that the probe modes are identical on every GPU.</p>
+</div>
+<script>
+window.MathJax = { tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] }, svg: { fontCache: 'global' } };
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-svg.js"></script>
+</body>
+</html>

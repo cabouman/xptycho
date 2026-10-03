@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>xptycho User's View</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one reading column; the scripts a user writes, one per use, then every public name in one table. Colors match the theory page. */
+:root {
+  --bg: #fbfaf7; --surface: #ffffff; --fg: #1f2328; --muted: #5f6670; --line: #d9d7d0;
+  --data: #b7791f; --fm: #0b7285; --unk: #2b6cb0; --par: #2f855a; --state: #6b46c1; --comp: #718096; --accent: #2b6cb0;
+  --sans: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+  --mono: "IBM Plex Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #15171b; --surface: #1d2025; --fg: #e6e4df; --muted: #a0a6ae; --line: #343a42;
+  --data: #e2b05a; --fm: #5ec8d8; --unk: #7fb0ea; --par: #7cc99a; --state: #b59cf0; --comp: #a7b0bd; --accent: #7fb0ea; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #15171b; --surface: #1d2025; --fg: #e6e4df; --muted: #a0a6ae; --line: #343a42;
+  --data: #e2b05a; --fm: #5ec8d8; --unk: #7fb0ea; --par: #7cc99a; --state: #b59cf0; --comp: #a7b0bd; --accent: #7fb0ea; color-scheme: dark }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--sans); font-size: 16px; line-height: 1.55; }
+.wrap { max-width: 920px; margin: 0 auto; padding-inline: 16px; padding-block: 28px 64px; }
+.crumb { font-size: 13px; color: var(--muted); margin: 0 0 14px; }
+.crumb a { color: var(--accent); text-decoration: none; }
+h1 { font-size: 30px; font-weight: 700; margin: 0 0 4px; }
+h2 { font-size: 22px; font-weight: 700; margin: 44px 0 10px; }
+h3 { font-size: 17px; font-weight: 700; margin: 24px 0 4px; }
+p { max-width: 70ch; margin: 0 0 10px; }
+.lead { color: var(--muted); font-size: 17px; }
+code { font-family: var(--mono); font-size: 0.9em; }
+a { color: var(--accent); }
+pre { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 10px 14px; font-family: var(--mono); font-size: 13px; line-height: 1.55; overflow-x: auto; margin: 8px 0 6px; }
+pre .c { color: var(--muted); }
+.note { font-size: 14px; color: var(--muted); max-width: 76ch; margin: 0 0 8px; }
+.frame { overflow-x: auto; }
+table.t { border-collapse: collapse; margin: 10px 0; font-size: 14px; width: 100%; }
+table.t th, table.t td { border-bottom: 1px solid var(--line); padding: 5px 12px 5px 0; text-align: left; vertical-align: top; }
+table.t th { font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+table.t td:first-child { font-family: var(--mono); font-size: 13px; white-space: nowrap; }
+.kind { font-size: 11.5px; font-weight: 600; padding: 0 7px; border-radius: 10px; border: 1px solid; white-space: nowrap; }
+.k-fm { color: var(--fm); border-color: var(--fm); } .k-par { color: var(--par); border-color: var(--par); } .k-comp { color: var(--comp); border-color: var(--comp); }
+.ask { border-left: 4px solid var(--unk); background: var(--surface); padding: 12px 16px; max-width: 78ch; margin: 16px 0; }
+.ask ol { margin: 6px 0 0; padding-left: 22px; }
+.ask li { margin: 6px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+<p class="crumb"><a href="index.html">xptycho design</a> &rsaquo; The user's view</p>
+<h1>The User's View</h1>
+<p class="lead">The scripts a user writes, one per use, and every public name in one place. The three objects are those of the <a href="objects.html">objects page</a>; the helper functions and the <code>Scan</code> methods are listed here for the first time. Written before the code, so that the code is written to match the scripts and not the other way around.</p>
+
+<h2>1. The scripts</h2>
+
+<h3>Simulate and reconstruct with a known probe (demo 1, TCI 2023 Fig. 6)</h3>
+<pre>import xptycho
+
+truth = xptycho.demo_truth('synthetic')             <span class="c"># truth.object, truth.probe, truth.pixel_size, from the demo data archive</span>
+positions = xptycho.scan_positions(grid=(12, 12), step=1.02e-6, max_offset=0.3e-6, seed=0)
+
+model = xptycho.PtychoModel(energy=8.8, detector_distance=2.0, detector_pixel=75e-6,
+                            frame_size=256, positions=positions, probe_modes=1)
+scan = model.simulate(truth.object, truth.probe, pixel_size=truth.pixel_size, peak_photons=1e4, seed=0)
+print(scan.summary())
+
+model.set_params(object_data_fit=0.6, probe_weight_exponent=1.25, relaxation=0.5)
+model.print_params()
+recon = model.recon(scan, probe=truth.probe, iterations=100)
+print(recon.summary())
+recon.show('./output/demo_1', compare_to=truth)
+recon.save('./output/demo_1')</pre>
+<p class="note">The detector distance and pixel are chosen so the model's object pixel equals the truth's pixel size. <code>simulate</code> compares the <code>pixel_size</code> it is given with the model's and refuses a mismatch, naming both values.</p>
+
+<h3>Preprocess measured data, then reconstruct blind with two modes (demo 2, TCI 2025)</h3>
+<p class="note">Two scripts, because preprocessing is done once and reconstruction many times.</p>
+<pre><span class="c"># script one: raw file to scan file</span>
+path = xptycho.fetch('goldballs_cxi')                                <span class="c"># entry 65 of the CXI database, cxidb.org; downloaded once</span>
+scan = xptycho.preprocess(path, dark='mean_of_dark_frames', crop=512, apodization='tukey',
+                          energy=1.0, detector_distance=0.112)         <span class="c"># positions and detector pixel come from the file</span>
+print(scan.summary()); scan.show('./output/goldballs')
+scan.save('goldballs.h5')
+
+<span class="c"># script two: reconstruct</span>
+scan = xptycho.Scan.load('goldballs.h5')
+model = xptycho.PtychoModel.from_scan(scan, probe_modes=2)
+model.set_params(object_data_fit=0.5, probe_data_fit=0.6, probe_weight_exponent=1.25,
+                 relaxation=0.5, mode_schedule=[20], initial_probe_distance=0.3e-6)
+recon = model.recon(scan, iterations=200)                            <span class="c"># probe not given: estimated</span>
+recon.show('./output/goldballs'); recon.save('./output/goldballs')</pre>
+
+<h3>Several GPUs</h3>
+<pre>model.configure_devices(num_devices=4)                               <span class="c"># default: every GPU present</span>
+recon = model.recon(scan, iterations=200)                            <span class="c"># the same call; the positions are divided among the GPUs</span></pre>
+
+<h3>Continue a finished run, and refine positions</h3>
+<pre>scan = xptycho.Scan.load('goldballs.h5')
+model = xptycho.PtychoModel.from_scan(scan, probe_modes=2)
+recon = xptycho.Reconstruction.load('./output/goldballs')
+new_pos, misfit = model.refine_positions(scan, recon.object, recon.probe, max_shift=1)
+model.set_params(positions=new_pos)
+recon = model.recon(scan, init=recon, iterations=100)</pre>
+
+<h3>The forward model alone</h3>
+<pre>amplitudes = model.forward(recon.object, recon.probe)                <span class="c"># (J, Np, Np), no noise</span>
+print(model.data_error(scan, recon.object, recon.probe))</pre>
+
+<h2>2. Every public name</h2>
+<div class="frame">
+<table class="t">
+  <tr><th>name</th><th>what it is</th></tr>
+  <tr><td>Scan</td><td>the measurement: frames, recorded positions, instrument facts. <code>Scan.load(path)</code>, <code>scan.save(path)</code>, <code>scan.summary()</code>, <code>scan.show(dir)</code>, <code>scan.positions</code>, <code>scan.num_frames</code>, <code>scan.frame_shape</code></td></tr>
+  <tr><td>PtychoModel</td><td>the parameters and the forward model; the <a href="objects.html">objects page</a>, section 2, lists every method</td></tr>
+  <tr><td>Reconstruction</td><td>what <code>recon</code> returns: <code>object</code>, <code>probe</code>, <code>pixel_size</code>, <code>origin</code>, <code>coverage</code>, <code>positions</code>, <code>mode_energies</code>, <code>params</code>, <code>curves</code>; <code>summary()</code>, <code>show()</code>, <code>save()</code>, <code>Reconstruction.load()</code></td></tr>
+  <tr><td>demo_truth(name)</td><td>a record with <code>object</code>, <code>probe</code>, and <code>pixel_size</code>, read from the demo data archive (downloaded once); for simulation and for <code>compare_to=</code></td></tr>
+  <tr><td>scan_positions(grid, step, max_offset, seed)</td><td>positions of a rectangular scan with random offsets, in meters</td></tr>
+  <tr><td>fetch(name)</td><td>download a named public dataset once; returns the local path of the raw file</td></tr>
+  <tr><td>preprocess(path, dark, crop, apodization, **facts)</td><td>a raw file to a <code>Scan</code>. <code>dark</code> is a dark frame array, or <code>'mean_of_dark_frames'</code> to average the dark frames the file holds. <code>crop</code> is the frame size kept about the beam center. <code>apodization='tukey'</code> multiplies each frame by a Tukey window (flat in the middle, tapering to zero at the edge). Instrument facts the file lacks are given as keywords.</td></tr>
+  <tr><td>nrmse(image, truth, coverage=None)</td><td>error after removing one complex scale; with <code>coverage</code> (the <code>Reconstruction</code>'s map of where the probe reached) only covered pixels count</td></tr>
+</table>
+</div>
+
+<h3>Parameters, by kind</h3>
+<div class="frame">
+<table class="t">
+  <tr><th>name</th><th>kind</th><th>meaning</th></tr>
+  <tr><td>energy / wavelength</td><td><span class="kind k-fm">fmodel</span></td><td>keV, or meters</td></tr>
+  <tr><td>detector_distance</td><td><span class="kind k-fm">fmodel</span></td><td>meters, object to detector</td></tr>
+  <tr><td>detector_pixel</td><td><span class="kind k-fm">fmodel</span></td><td>meters, after any binning</td></tr>
+  <tr><td>frame_size</td><td><span class="kind k-fm">fmodel</span></td><td>\(N_p\), detector pixels per side</td></tr>
+  <tr><td>positions</td><td><span class="kind k-fm">fmodel</span></td><td>(J, 2), row then column, meters; settable, for refinement</td></tr>
+  <tr><td>probe_modes</td><td><span class="kind k-fm">fmodel</span></td><td>\(K\)</td></tr>
+  <tr><td>object_data_fit, probe_data_fit</td><td><span class="kind k-par">recon</span></td><td>\(\alpha_1\), \(\alpha_2\); defaults 0.6, 0.6</td></tr>
+  <tr><td>probe_weight_exponent</td><td><span class="kind k-par">recon</span></td><td>\(\kappa\); default 1.25</td></tr>
+  <tr><td>relaxation</td><td><span class="kind k-par">recon</span></td><td>\(\rho\); default 0.5</td></tr>
+  <tr><td>mode_schedule</td><td><span class="kind k-par">recon</span></td><td>iterations at which a mode is added; default none</td></tr>
+  <tr><td>mode_energy_fraction</td><td><span class="kind k-par">recon</span></td><td>\(f\); default 0.05</td></tr>
+  <tr><td>initial_probe_distance</td><td><span class="kind k-par">recon</span></td><td>Fresnel distance for the initial probe and new modes, meters; default none (no propagation)</td></tr>
+  <tr><td>num_devices, devices</td><td><span class="kind k-comp">compute_params</span></td><td>arguments of <code>configure_devices</code>: how many GPUs, or which; see <a href="computing.html">Computing</a>, section 4</td></tr>
+</table>
+</div>
+<p class="note">Arguments of <code>recon</code>, not parameters: <code>probe</code>, <code>init_probe</code>, <code>init</code>, <code>iterations</code>.</p>
+
+<h2>3. Open points</h2>
+<div class="ask">
+  <ol>
+    <li><b>Laminography series.</b> One model per scan (positions differ per tilt), with the series handled by a loop in the user's script, or one object holding all of them. Claude's view: one model per scan in version 1; a series object only if the loop proves awkward.</li>
+    <li><b><code>demo_truth</code> returns a record</b> (<code>object</code>, <code>probe</code>, <code>pixel_size</code>) that <code>compare_to=</code> takes directly, as written above. Confirm.</li>
+    <li><b>Units of <code>energy</code>:</b> keV, as in the papers and the old configs.</li>
+  </ol>
+</div>
+</div>
+<script>
+window.MathJax = { tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] }, svg: { fontCache: 'global' } };
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-svg.js"></script>
+</body>
+</html>
