@@ -24,6 +24,20 @@ Qiuchen Zhai.  The method is described in the following papers.
     `IEEE Transactions on Computational Imaging, vol. 11, pp. 1320-1335,
     2025 <https://doi.org/10.1109/TCI.2025.3609957>`_.
 
+Two conference papers give earlier and shorter accounts.
+
+    Qiuchen Zhai, Gregery T. Buzzard, Kevin Mertes, Brendt Wohlberg, and
+    Charles A. Bouman, "Blind multi-mode ptychography using a distributed
+    probe estimate," `IEEE International Conference on Image Processing
+    (ICIP), pp. 1115-1120, 2025
+    <https://doi.org/10.1109/ICIP55913.2025.11084669>`_.
+
+    Qiuchen Zhai, Brendt Wohlberg, Gregery T. Buzzard, and Charles A.
+    Bouman, "Projected multi-agent consensus equilibrium for ptychographic
+    image reconstruction," `55th Asilomar Conference on Signals, Systems,
+    and Computers, pp. 1694-1698, 2021
+    <https://doi.org/10.1109/IEEECONF53345.2021.9723357>`_.
+
 Development
 -----------
 

@@ -55,22 +55,18 @@ ul.refs li { margin: 4px 0; }
   <div class="item">
     <h3><a href="objects.html">2. Objects and data</a></h3>
     <span class="status done">layout chosen</span>
-    <p>The mbirtorch pattern, chosen 2026-10-03: a <code>Scan</code> holds the data, a <code>PtychoModel</code> holds the forward-model, reconstruction, and compute parameters and computes <code>forward</code>, <code>simulate</code>, and <code>recon</code>; the unknowns pass through as arguments and results. The model drawn in full with every method, what <code>recon</code> returns (a <code>Reconstruction</code>), the two directions through the model, the scripts, position refinement as a method, and two open points.</p>
+    <p>The mbirtorch pattern, chosen 2026-10-03: a <code>Scan</code> holds the data, a <code>PtychoModel</code> holds the forward-model, reconstruction, and compute parameters and computes <code>forward</code>, <code>simulate</code>, and <code>recon</code>; a <code>Sample</code> holds the unknowns, an object and its probe, whether true or estimated. The model drawn in full with every method, the <code>Sample</code> and the record of its run, the HDF5 file format, the two directions through the model, the scripts, position refinement as a method, and two open points.</p>
   </div>
   <div class="item">
     <h3><a href="computing.html">3. Computing</a></h3>
     <span class="status done">decided</span>
-    <p>The design for carrying out the iteration on \(N_g\) GPUs of one node, all data in GPU memory, fully sharded as in mbirtorch: per-position arrays by position, the object image by row into bands with owners, small arrays broadcast. What each GPU holds and how large a scan fits; what each GPU computes and what moves between GPUs in every step; what crosses between host and GPU; how the user chooses the GPUs. Reviewed by a panel: <a href="panel-computing.html">its report</a>.</p>
+    <p>The design for carrying out the iteration on \(N_g\) GPUs of one node, all data in GPU memory, fully sharded as in mbirtorch: per-position arrays by position, the object image by row into bands with owners, small arrays broadcast. What each GPU holds and how large a scan fits; what each GPU computes and what moves between GPUs in every step; what crosses between host and GPU; how the user chooses the GPUs.</p>
   </div>
   <div class="item">
     <h3><a href="users-view.html">4. The user's view</a></h3>
     <span class="status todo">draft</span>
     <p>The scripts a user writes, one per use: the two demos, a cluster run that resumes, continuing and refining, the forward model alone. Every public name and every parameter by kind in one place. Three open points.</p>
   </div>
-</div>
-
-<div class="note">
-  <b>How these pages are used.</b> Each page is the record of a decision, not a draft of code. When a decision changes, the page changes with it. The pages were written before the code, in conversation between Charlie Bouman and Claude, with a second Claude agent ("Vera") and a review panel checking each step.
 </div>
 
 <h2>References</h2>

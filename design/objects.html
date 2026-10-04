@@ -108,7 +108,7 @@ table.where th { font-size: 12px; letter-spacing: 0.06em; text-transform: upperc
 <div class="wrap">
 <p class="crumb"><a href="index.html">xptycho design</a> &rsaquo; Objects and data</p>
 <h1>Objects and Data</h1>
-<p class="lead">How the five kinds of quantities from the <a href="theory.html">theory page</a> map onto objects. The layout is the mbirtorch pattern, chosen by Charlie on 2026-10-03 after Claude and Vera reached it independently: one model holds the parameters and the forward model, and the unknowns pass through it as arguments and results. <code>recon</code> returns a <code>Reconstruction</code>: the two unknowns with the record of the run. Position refinement is a method the user calls (section 6). Two points remain open (section 7).</p>
+<p class="lead">How the five kinds of quantities from the <a href="theory.html">theory page</a> map onto objects. The layout is the mbirtorch pattern, chosen by Charlie on 2026-10-03 after Claude and Vera reached it independently: one model holds the parameters and the forward model, and the unknowns pass through it as arguments and results. The unknowns are held in a <code>Sample</code>: an object and the probe it was seen with. A ground truth and a reconstruction are both a <code>Sample</code>; <code>simulate</code> takes one and <code>recon</code> returns one. Position refinement is a method the user calls (section 7). Two points remain open (section 8).</p>
 
 <h2>1. The three things a user holds</h2>
 <div class="three">
@@ -131,12 +131,12 @@ table.where th { font-size: 12px; letter-spacing: 0.06em; text-transform: upperc
     </ul>
   </div>
   <div class="thing t-unk">
-    <h3>The unknowns, and <code>Reconstruction</code></h3>
-    <div class="what">The unknowns go in as arguments. They come back inside a <code>Reconstruction</code>.</div>
+    <h3><code>Sample</code></h3>
+    <div class="what">The unknowns: an object and the probe it was seen with. A truth or an estimate.</div>
     <ul>
-      <li><span class="chip unk">unknowns</span> the object image \(x\), complex, on the object grid; the probe modes \(d\), complex \((K, N_p, N_p)\). Given to <code>forward</code> and <code>simulate</code>; given to <code>recon</code> when known.</li>
-      <li><code>recon</code> returns a <code>Reconstruction</code> holding both unknowns (<code>object</code>, <code>probe</code>) and the record of the run: the parameter table the run used, the pixel pitch, origin, and coverage needed to read the image, and the data-error curve. Drawn in section 3.</li>
-      <li>It saves itself to a folder and loads back, so a cluster job's output is one thing.</li>
+      <li><span class="chip unk">unknowns</span> the object image \(x\), complex, on the object grid; the probe modes \(d\), complex \((K, N_p, N_p)\). Both on one grid, with its <code>pixel_pitch</code>.</li>
+      <li>A ground truth is a <code>Sample</code>, given to <code>simulate</code>. <code>recon</code> returns a <code>Sample</code> that also carries <code>run</code>, the record of how it was made. Drawn in section 3.</li>
+      <li>It saves itself to one HDF5 file and loads back (section 4), so a cluster job's output is one thing.</li>
     </ul>
   </div>
 </div>
@@ -190,10 +190,10 @@ table.where th { font-size: 12px; letter-spacing: 0.06em; text-transform: upperc
       <div class="meth"><code>model.configure_devices(num_devices=1, devices=None)</code><span>Choose the devices, as in mbirtorch: a count of GPUs, or an explicit list. Without a call the model chooses automatically. See <a href="computing.html">Computing</a>, section 4.</span></div>
       <div class="meth"><code>model.print_params()</code><span>Print every parameter with its value, units, and origin (given, file, derived, default).</span></div>
       <div class="meth"><code>model.forward(x, d)</code><span><b>The forward model.</b> For every scan position: cut the patch out of <code>x</code>, multiply by each probe mode, far-field transform, sum the modes in intensity. Returns the noiseless amplitudes \(y_j\), shape \((J, N_p, N_p)\). Stores nothing.</span></div>
-      <div class="meth"><code>model.simulate(x, d, pixel_pitch=None, peak_photons=None, dark_rate=0, seed=0)</code><span>Calls <code>forward</code>, after checking that <code>pixel_pitch</code>, when given, equals the model's object pixel pitch, scales the intensities so the brightest sample is <code>peak_photons</code>, draws Poisson counts, and returns a <code>Scan</code> carrying this model's positions and instrument facts. Without <code>peak_photons</code>, the exact intensities.</span></div>
-      <div class="meth"><code>model.recon(scan, probe=None, init_probe=None, init=None, iterations=…)</code><span><b>The reconstruction.</b> With <code>probe=</code>, the probe is known and held fixed. Without it, the probe is estimated: from <code>init_probe=</code> when given, else from the data-driven initialization. A given <code>probe=</code> must have all \(K\) modes. An estimate may start with fewer: one mode from the initialization, or however many <code>init_probe=</code> has, and reaches \(K\) by adding a mode at each iteration of <code>mode_schedule</code> (theory page, section 5). The schedule must have enough entries to reach \(K\), or <code>recon</code> refuses before it starts. <code>init=</code> warm-starts both unknowns from a previous <code>Reconstruction</code>. <code>iterations</code> is the one setting that changes on every call, so it is an argument here, as mbirtorch's <code>max_iterations</code> is. Returns a <code>Reconstruction</code>. The run state lives only inside this call.</span></div>
+      <div class="meth"><code>model.simulate(sample, peak_photons=None, dark_rate=0, seed=0)</code><span>Calls <code>forward</code> on the sample's object and probe, after checking that the sample's <code>pixel_pitch</code> equals the model's, scales the intensities so the brightest detector pixel is <code>peak_photons</code>, draws Poisson counts, and returns a <code>Scan</code> carrying this model's positions and instrument facts. Without <code>peak_photons</code>, the exact intensities.</span></div>
+      <div class="meth"><code>model.recon(scan, probe=None, init_probe=None, init=None, iterations=…)</code><span><b>The reconstruction.</b> With <code>probe=</code>, the probe is known and held fixed. Without it, the probe is estimated: from <code>init_probe=</code> when given, else from the data-driven initialization. A given <code>probe=</code> must have all \(K\) modes. An estimate may start with fewer: one mode from the initialization, or however many <code>init_probe=</code> has, and reaches \(K\) by adding a mode at each iteration of <code>mode_schedule</code> (theory page, section 5). The schedule must have enough entries to reach \(K\), or <code>recon</code> refuses before it starts. <code>init=</code> warm-starts both unknowns from a <code>Sample</code>, usually a previous result. <code>iterations</code> is the one setting that changes on every call, so it is an argument here, as mbirtorch's <code>max_iterations</code> is. Returns a <code>Sample</code> with its <code>run</code> record. The run state lives only inside this call.</span></div>
       <div class="meth"><code>model.data_error(scan, x, d)</code><span>The normalized distance between <code>forward(x, d)</code> and the scan's amplitudes. The curve <code>recon</code> reports, available on its own.</span></div>
-      <div class="meth"><code>model.refine_positions(scan, x, d, max_shift=1)</code><span>One refinement pass: for each position, the integer shift within <code>max_shift</code> whose <code>forward</code> best matches the data, given <code>x</code> and <code>d</code>. Returns the refined positions and the per-position misfit. Changes nothing. Section 6.</span></div>
+      <div class="meth"><code>model.refine_positions(scan, x, d, max_shift=1)</code><span>One refinement pass: for each position, the integer shift within <code>max_shift</code> whose <code>forward</code> best matches the data, given <code>x</code> and <code>d</code>. Returns the refined positions and the per-position misfit. Changes nothing. Section 7.</span></div>
       <div class="meth"><code>model.initial_probe(scan), model.initial_object(scan, d)</code><span>The two initialization formulas of the theory page, exposed so a user can look at the starting point. <code>recon</code> calls them when nothing is given.</span></div>
     </div>
     </div>
@@ -204,32 +204,32 @@ table.where th { font-size: 12px; letter-spacing: 0.06em; text-transform: upperc
 <p>The forward model is written once, in <code>forward</code>. Everything else that needs it calls it.</p>
 <div class="flows">
   <div class="flow">
-    <span class="lab">simulation: known \(x\) and \(d\) in, data out</span>
-    <div class="node n-unk"><b>x, d</b>a known object and probe</div>
+    <span class="lab">simulation: a known sample in, data out</span>
+    <div class="node n-unk"><b>Sample</b>x, d: a known object and probe</div>
     <div class="arr">&rarr;</div>
-    <div class="node n-fm"><b>model.simulate(x, d, …)</b>forward, then Poisson counts</div>
+    <div class="node n-fm"><b>model.simulate(sample, …)</b>forward, then Poisson counts</div>
     <div class="arr">&rarr;</div>
     <div class="node n-data"><b>Scan</b>frames, positions, facts</div>
   </div>
   <div class="flow">
-    <span class="lab">reconstruction: data in, \(x\) (and \(d\)) out</span>
+    <span class="lab">reconstruction: data in, a sample out</span>
     <div class="node n-data"><b>Scan</b>frames, positions, facts</div>
     <div class="arr">&rarr;</div>
     <div class="node n-fm"><b>model.recon(scan, probe=…)</b>PMACE; the run state lives here</div>
     <div class="arr">&rarr;</div>
-    <div class="node n-unk"><b>Reconstruction</b>x̂, d̂, and the record of the run</div>
+    <div class="node n-unk"><b>Sample</b>x̂, d̂, and the record of the run</div>
   </div>
 </div>
-<p>Two more uses share the same <code>forward</code>: <code>data_error</code>, and <code>refine_positions</code>, which compares <code>forward</code> at shifted positions against the data. A continued run is another <code>recon</code> call on the same model with <code>init=</code> the previous <code>Reconstruction</code>.</p>
+<p>Two more uses share the same <code>forward</code>: <code>data_error</code>, and <code>refine_positions</code>, which compares <code>forward</code> at shifted positions against the data. A continued run is another <code>recon</code> call on the same model with <code>init=</code> the previous <code>Sample</code>.</p>
 
-<h3>What <code>recon</code> returns</h3>
-<p>A <code>Reconstruction</code> holds two things and nothing else: the unknowns, and a record of the run. The record is not a new kind of quantity; it is copies and derived values of what the model holds, frozen at the time of the run. Nothing of the run state and nothing of the measured data comes back.</p>
+<h3>The <code>Sample</code></h3>
+<p>A <code>Sample</code> holds the unknowns and what is needed to read them. One that <code>recon</code> returns also holds <code>run</code>, a record of the run; for a ground truth <code>run</code> is absent. The record is not a new kind of quantity; it is copies and derived values of what the model holds, frozen at the time of the run. Nothing of the run state and nothing of the measured data is in a <code>Sample</code>.</p>
 <div class="model" style="border-color: var(--unk)">
-  <h3>Reconstruction</h3>
+  <h3>Sample</h3>
   <div class="groups">
     <div class="group" style="border-color: var(--unk); background: var(--unk-bg)">
       <h4>The unknowns</h4>
-      <div class="how">Estimated, or given to <code>recon</code> and passed back, so the object is complete on its own.</div>
+      <div class="how">True, or estimated. A probe given to <code>recon</code> is passed back, so the sample is complete on its own.</div>
       <ul>
         <li><code>object</code>: \(\hat x\), complex, on the object grid</li>
         <li><code>probe</code>: \(\hat d\), complex \((K, N_p, N_p)\)</li>
@@ -237,49 +237,71 @@ table.where th { font-size: 12px; letter-spacing: 0.06em; text-transform: upperc
     </div>
     <div class="group g-fm">
       <h4>To read the image</h4>
-      <div class="how">Derived from the forward-model parameters and the probe.</div>
+      <div class="how">Where the grid sits.</div>
       <ul>
-        <li><code>pixel_pitch</code>, <code>origin</code>: where the grid sits, in meters</li>
-        <li><code>coverage</code>: the accumulated probe weight; zero where no probe reached</li>
+        <li><code>pixel_pitch</code>: the spacing of the pixels, in meters</li>
+        <li><code>origin</code>: the position of the first pixel, in meters</li>
         <li><code>mode_energies</code>: the share of the probe energy in each mode</li>
-        <li><code>positions</code>: the positions the run used</li>
+        <li><code>name</code>: a label</li>
       </ul>
     </div>
     <div class="group g-par">
-      <h4>The record of the run</h4>
-      <div class="how">What <code>model.print_params()</code> showed, plus what happened.</div>
+      <h4><code>run</code>: the record of the run</h4>
+      <div class="how">Only for an estimate. What <code>model.print_params()</code> showed, plus what happened.</div>
       <ul>
-        <li><code>params</code>: fmodel_params, recon_params, compute_params, each with its origin</li>
-        <li><code>curves</code>: the data error per iteration; object and probe error when a truth is given</li>
-        <li>iterations run, time, devices</li>
+        <li><code>run.parameters</code>: fmodel_params, recon_params, compute_params, each with its origin; the time and the devices</li>
+        <li><code>run.data_error</code>: the data error at each iteration</li>
+        <li><code>run.iterations</code>: the iterations run</li>
+        <li><code>run.positions</code>: the positions the run used</li>
+        <li><code>run.coverage</code>: the accumulated probe weight; zero where no probe reached</li>
       </ul>
     </div>
   </div>
   <div class="methods">
     <h4>Methods</h4>
     <div class="meths">
-      <div class="meth"><code>recon.summary()</code><span>The parameter table as text, then the iteration count, the final errors, the time, and the devices.</span></div>
-      <div class="meth"><code>recon.show(directory=None, compare_to=None)</code><span>Magnitude and phase of the object over the coverage, the probe modes with their energy fractions, and the curves. With a truth, the error images and the NRMSE.</span></div>
-      <div class="meth"><code>recon.save(directory)</code><span>One folder: <code>summary.txt</code>, <code>parameters.csv</code>, <code>recon.h5</code> (object, probe, positions, coverage, curves, with pixel pitch and origin as attributes), preview images, <code>plots/</code>. <code>recon.h5</code> is the file a laminography reconstruction reads.</span></div>
-      <div class="meth"><code>Reconstruction.load(directory) <em>classmethod</em></code><span>Read a folder written by <code>save</code>.</span></div>
+      <div class="meth"><code>sample.summary()</code><span>The sizes and the pixel pitch as text; for an estimate, also the parameter table, the iteration count, and the final data error.</span></div>
+      <div class="meth"><code>sample.show(directory=None, compare_to=None)</code><span>Magnitude and phase of the object, the probe modes with their energy fractions, and for an estimate the data error at each iteration, each figure with a caption. With <code>compare_to=</code> a known <code>Sample</code>, the truth beside the estimate and the NRMSE.</span></div>
+      <div class="meth"><code>sample.save(path)</code><span>Write the groups <code>/sample</code> and, for an estimate, <code>/run</code> of an HDF5 file (section 4). This is the file a laminography reconstruction reads.</span></div>
+      <div class="meth"><code>Sample.load(path) <em>classmethod</em></code><span>Read the sample, and the record of its run when there is one, from an HDF5 file.</span></div>
     </div>
   </div>
 </div>
 
 <h3>How the probe reaches \(K\) modes</h3>
-<p>Mode addition is inside <code>recon</code>. The user sets the target and the timing: \(K\) on the model (<code>probe_modes=2</code>) is how many modes the run ends with; <code>mode_schedule=[20]</code> is the iterations at which a mode is added; <code>mode_energy_fraction</code> is the energy a new mode starts with. <code>recon</code> starts with one mode (or the modes in <code>init_probe=</code>) and at each scheduled iteration runs the six steps of theory section 5. The user sees it in three places: the progress line printed at that iteration ("iteration 20: mode 2 added, 5% of the energy"); <code>recon.curves</code>, which carries a probe-error curve per mode when a truth is given; and the result, <code>recon.probe</code> of shape \((K, N_p, N_p)\) with <code>recon.mode_energies</code>, the final share of each mode.</p>
+<p>Mode addition is inside <code>recon</code>. The user sets the target and the timing: \(K\) on the model (<code>probe_modes=2</code>) is how many modes the run ends with; <code>mode_schedule=[20]</code> is the iterations at which a mode is added; <code>mode_energy_fraction</code> is the energy a new mode starts with. <code>recon</code> starts with one mode (or the modes in <code>init_probe=</code>) and at each scheduled iteration runs the six steps of theory section 5. The user sees it in three places: the progress line printed at that iteration ("iteration 20: mode 2 added, 5% of the energy"); the convergence figure, which marks that iteration; and the result, <code>recon.probe</code> of shape \((K, N_p, N_p)\) with <code>recon.mode_energies</code>, the final share of each mode.</p>
 
-<h2>4. The scripts</h2>
+<h2>4. The file format</h2>
+<p>A scan and a sample are groups of an HDF5 file. One file may hold either or both. Each class reads and writes only its own groups and keeps the others, so a simulated dataset can be one file holding the scan and its truth. Lengths are in meters. Only functions named for it touch files: <code>load</code>, <code>save</code>, and <code>download</code>. Every other function takes and returns objects in memory, and the package holds no address, folder, or file name.</p>
+<pre>file.h5                 attribute: format_version
+    /scan               attributes: wavelength, detector_distance, detector_pitch, name
+        frames          (J, Np, Np) intensities
+        positions       (J, 2), row and column of each probe center
+    /sample             attributes: pixel_pitch, origin, name
+        object          complex64 (rows, cols)
+        probe           complex64 (K, Np, Np)
+    /run                attribute: iterations.  Present for a reconstruction.
+        parameters      (N, 4) text: name, value, units, origin
+        data_error      (iterations,)
+        positions       (J, 2), the positions the run used
+        coverage        (rows, cols), the accumulated probe weight</pre>
+<table class="where">
+  <tr><th>class</th><th>reads and writes</th></tr>
+  <tr><td><code>Scan</code></td><td><code>/scan</code></td></tr>
+  <tr><td><code>Sample</code></td><td><code>/sample</code>, and <code>/run</code> when it has a record</td></tr>
+</table>
+
+<h2>5. The scripts</h2>
 <pre><span class="c"># 1. simulated scan, known probe (TCI 2023, Fig. 6)</span>
-truth = xpt.demo_truth('synthetic')                                <span class="c"># truth.object, truth.probe, truth.pixel_pitch</span>
+truth = xpt.Sample.load(xpt.download(TRUTH_URL, DATA_DIR))         <span class="c"># a Sample: truth.object, truth.probe, truth.pixel_pitch</span>
 model = xpt.PtychoModel(energy=8.8, detector_distance=L, detector_pitch=p,
                         frame_size=256, positions=pos, probe_modes=1)
-scan = model.simulate(truth.object, truth.probe, pixel_pitch=truth.pixel_pitch, peak_photons=1e4, seed=0)
+scan = model.simulate(truth, peak_photons=1e4, seed=0)
 model.set_params(object_data_fit=0.6, probe_weight_exponent=1.25, relaxation=0.5)
 model.print_params()
 recon = model.recon(scan, probe=truth.probe, iterations=100)      <span class="c"># probe given, held fixed</span>
-print(xpt.nrmse(recon.object, truth.object))
-recon.show(OUTPUT_DIR, compare_to=truth); recon.save(OUTPUT_DIR)
+recon.show(OUTPUT_DIR, compare_to=truth)                          <span class="c"># the estimate beside the truth, and the NRMSE</span>
+recon.save(OUTPUT_DIR + '/recon.h5')
 
 <span class="c"># 2. measured scan, blind, two modes (TCI 2025)</span>
 scan = xpt.Scan.load('gold_balls.h5')
@@ -290,22 +312,22 @@ model.configure_devices(num_devices=4, batch_size=512)
 recon = model.recon(scan, iterations=200)                         <span class="c"># probe not given, so estimated</span>
 recon.probe                                                       <span class="c"># (2, h, w)</span>
 recon = model.recon(scan, init=recon, iterations=100)             <span class="c"># continue from the previous result</span>
-recon.save(OUTPUT_DIR)</pre>
+recon.save(OUTPUT_DIR + '/recon.h5')</pre>
 
-<h2>5. Where each kind lives</h2>
+<h2>6. Where each kind lives</h2>
 <table class="where">
   <tr><th>kind</th><th>lives in</th></tr>
   <tr><td><span class="chip data">measured data</span></td><td><code>Scan</code></td></tr>
   <tr><td><span class="chip fm">fmodel_params</span></td><td><code>PtychoModel</code>, fixed at construction; a copy of the recorded ones in <code>Scan</code></td></tr>
-  <tr><td><span class="chip unk">unknowns</span></td><td>arguments of <code>forward</code>, <code>simulate</code>, <code>recon</code>; returned inside a <code>Reconstruction</code></td></tr>
+  <tr><td><span class="chip unk">unknowns</span></td><td><code>Sample</code>: given to <code>simulate</code>, returned by <code>recon</code></td></tr>
   <tr><td><span class="chip par">recon_params</span></td><td><code>PtychoModel</code>, <code>set_params</code></td></tr>
   <tr><td><span class="chip comp">compute_params</span></td><td><code>PtychoModel</code>, <code>configure_devices</code></td></tr>
   <tr><td><span class="chip state">run state</span></td><td>inside <code>recon</code></td></tr>
 </table>
 
-<div class="rec"><b>Why the unknowns are not in the model.</b> The same probe is fixed in one run and estimated in the next; an argument states which, an attribute cannot. The object's size depends on the object grid, a reconstruction parameter, so it cannot exist when the model is built. And the image goes straight to mbirtorch, whose users already write <code>image = model.recon(data)</code>.</div>
+<div class="rec"><b>Why the unknowns are not in the model.</b> The same probe is fixed in one run and estimated in the next; an argument states which, an attribute cannot. The object's size depends on the object grid, a reconstruction parameter, so it cannot exist when the model is built. And a truth and an estimate are then the same kind of object, so they are compared, saved, and shown in the same way.</div>
 
-<h2>6. Position refinement</h2>
+<h2>7. Position refinement</h2>
 <p>Positions are a forward-model parameter, read from the scan file, and in most runs they are accurate enough to leave alone. Sometimes they are not, and the user usually knows which from the instrument. So refinement is a method the user calls, never something <code>recon</code> does on its own.</p>
 <p>The method is Qiuchen's: for each position, try every integer shift within <code>max_shift</code>, run <code>forward</code> at each against the current object and probe, and keep the shift that best matches the measurement. It trusts the current image, so it is called after some iterations, and it costs 9 to 25 forward projections per position per pass.</p>
 <pre>recon = model.recon(scan, iterations=50)
@@ -315,11 +337,10 @@ recon = model.recon(scan, init=recon, iterations=150)     <span class="c"># cont
 <ul style="max-width:76ch;font-size:15px">
   <li><code>refine_positions</code> changes nothing. It returns the refined positions and, per position, how much better the best shift fits than the current one. A user who sees nothing to gain leaves the positions alone.</li>
   <li>The user accepts a change with <code>set_params(positions=...)</code>. The scan keeps the recorded positions, so the correction is always visible as the difference.</li>
-  <li>Several rounds are several <code>recon</code> calls, each a warm start from the previous <code>Reconstruction</code>.</li>
+  <li>Several rounds are several <code>recon</code> calls, each a warm start from the previous <code>Sample</code>.</li>
 </ul>
 
-<h2>7. Open points</h2>
-<p>Decided 2026-10-03: <code>recon</code> returns a <code>Reconstruction</code> (section 3); <code>iterations</code> is an argument of <code>recon</code>.</p>
+<h2>8. Open points</h2>
 <div class="ask">
   <ol>
     <li><b>Continuing a run.</b> <code>init=recon</code> rebuilds the per-position copies from the averages, so a continued run is not identical to one uninterrupted run of the same length. Acceptable for a warm start.</li>
