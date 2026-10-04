@@ -46,13 +46,13 @@ scan, and its :meth:`~xptycho.PtychoModel.recon` method does the reconstruction:
 
     scan = xpt.Scan(frames, positions, energy=8.8, detector_distance=2.0, detector_pitch=75e-6)
     print(scan.summary())
-    scan.show()                                   # one frame and the map of positions
+    xpt.view_scan(scan)                           # one frame and the map of positions
 
     model = xpt.PtychoModel.from_scan(scan)
     model.print_params()                          # every parameter, its units, and its origin
     recon = model.recon(scan, iterations=100)     # no probe given, so it is estimated
 
-    recon.show()                                  # the object, the probe, the data-error curve
+    xpt.view_sample(recon)                        # the object, the probe, the data-error curve
     recon.save('./output/my_scan.h5')
     image = recon.object                          # complex array; recon.pixel_pitch is in meters
 

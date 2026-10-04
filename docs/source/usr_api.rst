@@ -19,7 +19,7 @@ record of the run.  A ground truth is also a :class:`~xptycho.Sample`.  The desi
     recon = model.recon(scan, iterations=200)        # probe not given, so estimated
 
     print(recon.summary())
-    recon.show(OUTPUT_DIR)
+    xpt.view_sample(recon)
     recon.save(OUTPUT_DIR + '/recon.h5')
 
 The model
@@ -66,6 +66,20 @@ class reads and writes only its own groups and keeps the others.  Lengths are in
             data_error      (iterations,)
             positions       (J, 2), the positions the run used
             coverage        (rows, cols), the accumulated probe weight
+
+Viewing
+-------
+
+The viewing functions are separate from the objects they show.  Each makes
+figures, puts them on the screen, and returns them; the windows zoom and pan
+with the mouse.  The part of the object shown is an argument, chosen in the
+script.
+
+.. autofunction:: xptycho.view_scan
+
+.. autofunction:: xptycho.view_sample
+
+.. autofunction:: xptycho.save_figures
 
 Demo tools
 ----------

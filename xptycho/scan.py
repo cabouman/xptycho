@@ -84,25 +84,13 @@ class Scan:
         ]
         return '\n'.join(lines)
 
-    def show(self, directory=None, block=True):
-        """Plot one frame on a log scale and the map of scan positions, with
-        a caption, and put the figure on the screen.
-
-        Args:
-            directory (str, optional): where the figure is also saved, as
-                ``scan.png``.
-            block (bool, optional): wait until the window is closed.  False
-                leaves it open and returns.  Defaults to True.
-        """
-        from .view import show_scan
-        show_scan(self, directory, block)
-
     def save(self, path):
         """Write the scan to the group ``/scan`` of an HDF5 file.  A file
         that exists keeps its other groups."""
         with h5py.File(path, 'a') as f:
             g = open_group(f, 'scan')
-            g.create_dataset('frames', data=self.frames, chunks=(1,) + self.frames.shape[1:])
+            g.create_dataset('frames', data=self.frames, chunks=(1,) + self.frames.shape[1:], compression='gzip',
+                             compression_opts=1, shuffle=True)
             g.create_dataset('positions', data=self.positions)
             g['positions'].attrs['units'] = 'm'
             g['positions'].attrs['order'] = 'row, column'

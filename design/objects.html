@@ -261,7 +261,6 @@ table.where th { font-size: 12px; letter-spacing: 0.06em; text-transform: upperc
     <h4>Methods</h4>
     <div class="meths">
       <div class="meth"><code>sample.summary()</code><span>The sizes and the pixel pitch as text; for an estimate, also the parameter table, the iteration count, and the final data error.</span></div>
-      <div class="meth"><code>sample.show(directory=None, compare_to=None)</code><span>Magnitude and phase of the object, the probe modes with their energy fractions, and for an estimate the data error at each iteration, each figure with a caption. With <code>compare_to=</code> a known <code>Sample</code>, the truth beside the estimate and the NRMSE.</span></div>
       <div class="meth"><code>sample.save(path)</code><span>Write the groups <code>/sample</code> and, for an estimate, <code>/run</code> of an HDF5 file (section 4). This is the file a laminography reconstruction reads.</span></div>
       <div class="meth"><code>Sample.load(path) <em>classmethod</em></code><span>Read the sample, and the record of its run when there is one, from an HDF5 file.</span></div>
     </div>
@@ -300,7 +299,7 @@ scan = model.simulate(truth, peak_photons=1e4, seed=0)
 model.set_params(object_data_fit=0.6, probe_weight_exponent=1.25, relaxation=0.5)
 model.print_params()
 recon = model.recon(scan, probe=truth.probe, iterations=100)      <span class="c"># probe given, held fixed</span>
-recon.show(OUTPUT_DIR, compare_to=truth)                          <span class="c"># the estimate beside the truth, and the NRMSE</span>
+xpt.view_sample(recon, compare_to=truth)                          <span class="c"># the estimate beside the truth</span>
 recon.save(OUTPUT_DIR + '/recon.h5')
 
 <span class="c"># 2. measured scan, blind, two modes (TCI 2025)</span>

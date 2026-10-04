@@ -87,6 +87,7 @@ object from a ptychographic scan.
    install
    demos
    usr_api
+   usr_preprocess
 
 .. toctree::
    :hidden:

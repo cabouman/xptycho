@@ -78,7 +78,7 @@ Three objects
 
       **The object and its probe.**  A ground truth and a reconstruction are
       both a sample; a reconstruction also carries the record of its run.  It
-      shows itself, saves itself, and can start another run.
+      saves itself and can start another run.
 
 .. code-block:: python
 
@@ -87,7 +87,7 @@ Three objects
    scan = xpt.Scan.load('scan.h5')          # frames, positions, instrument facts
    model = xpt.PtychoModel.from_scan(scan)  # the forward model
    recon = model.recon(scan, iterations=100)    # no probe given: it is estimated
-   recon.show()                                 # object, probe, data-error curve
+   xpt.view_sample(recon)                       # object, probe, data-error curve
    recon.save('./output/recon.h5')              # the sample and the record of the run
 
 Speed

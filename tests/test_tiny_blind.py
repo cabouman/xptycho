@@ -49,3 +49,21 @@ def test_matches_old_code(devices, iterations):
     for mine, theirs in zip(recon.probe, old['probe']):
         close(numbers(mine), theirs)
     assert recon.run.data_error[-1] == pytest.approx(old['nrmse_meas'], rel=TOLERANCE)
+
+
+def test_orthogonalize_modes_keeps_the_fit():
+    """Making the modes orthogonal changes the modes, not the intensities
+    they predict."""
+    model, scan, _ = setup(('cpu',))
+    plain = model.recon(scan, iterations=BASELINE['add_mode'][0] - 1, verbose=0)      # stop before the addition
+
+    def after_addition(orthogonalize):
+        model.set_params(orthogonalize_modes=orthogonalize)
+        return model.recon(scan, init=plain, iterations=1, verbose=0)
+
+    model.set_params(mode_schedule=[1])            # add the mode in the first iteration of the continued run
+    off, on = after_addition(False), after_addition(True)
+    inner = abs(np.vdot(on.probe[0], on.probe[1])) / (np.linalg.norm(on.probe[0]) * np.linalg.norm(on.probe[1]))
+    inner_off = abs(np.vdot(off.probe[0], off.probe[1])) / (np.linalg.norm(off.probe[0]) * np.linalg.norm(off.probe[1]))
+    assert len(on.probe) == 2 and inner < inner_off
+    assert np.linalg.norm(on.probe[0]) >= np.linalg.norm(on.probe[1])

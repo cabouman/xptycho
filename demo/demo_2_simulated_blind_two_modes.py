@@ -10,6 +10,8 @@ second mode at iteration 20, and estimates the object and both modes.
 The ground truth downloads on first run (3 MB).  Run from the
 repository root.  The run takes about two minutes on a GPU.
 """
+import matplotlib.pyplot as plt
+
 import xptycho as xpt
 
 # ---------------------------- Parameters ----------------------------
@@ -59,7 +61,7 @@ model.set_params(object_shape=truth.object.shape)
 # Simulate the scan from the true object and both true modes.
 scan = model.simulate(truth, peak_photons=PEAK_PHOTONS, seed=SEED)
 print(scan.summary())
-scan.show(OUTPUT_DIR, block=False)          # one frame and the scan positions; stays open
+xpt.save_figures(xpt.view_scan(scan), OUTPUT_DIR)          # one frame and the scan positions
 
 model.set_params(object_data_fit=OBJECT_DATA_FIT, probe_data_fit=PROBE_DATA_FIT,
                  probe_weight_exponent=PROBE_WEIGHT_EXPONENT, relaxation=RELAXATION,
@@ -73,6 +75,13 @@ recon = model.recon(scan, iterations=ITERATIONS)
 print(recon.summary())
 recon.save(OUTPUT_DIR + '/recon.h5')          # the object, the probe, and the record of the run
 
-# The object against the truth, the probe, and the convergence of the data error.
-# Each figure is saved in OUTPUT_DIR and shown on the screen; close the windows to end.
-recon.show(OUTPUT_DIR, compare_to=truth)
+# The error to the truth, inside the rectangle spanned by the probe centers.
+region = recon.scanned_region()
+print('object NRMSE to the truth: {:.6f}'.format(xpt.nrmse(recon.object, truth.object, region)))
+
+# View the object beside the truth, the probe, and the convergence of the data error.
+# With no region given, the view shows the rectangle spanned by the probe centers.
+figures = xpt.view_sample(recon, compare_to=truth)
+xpt.save_figures(figures, OUTPUT_DIR)
+
+plt.show()          # keep the windows open until they are closed

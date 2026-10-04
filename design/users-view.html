@@ -69,7 +69,8 @@ model.set_params(object_data_fit=0.6, probe_weight_exponent=1.25, relaxation=0.5
 model.print_params()
 recon = model.recon(scan, probe=truth.probe, iterations=100)
 print(recon.summary())
-recon.show('./output/demo_1', compare_to=truth)
+figures = xpt.view_sample(recon, compare_to=truth)
+xpt.save_figures(figures, './output/demo_1')
 recon.save('./output/demo_1/recon.h5')</pre>
 <p class="note">The detector distance is chosen so the model's object pixel equals the truth's pixel pitch. <code>simulate</code> compares the sample's <code>pixel_pitch</code> with the model's and refuses a mismatch, naming both values.</p>
 
@@ -79,7 +80,7 @@ recon.save('./output/demo_1/recon.h5')</pre>
 path = xpt.fetch('goldballs_cxi')                                    <span class="c"># entry 65 of the CXI database, cxidb.org; downloaded once</span>
 scan = xpt.preprocess(path, dark='mean_of_dark_frames', crop=512, apodization='tukey',
                       energy=1.0, detector_distance=0.112)         <span class="c"># positions and detector pitch come from the file</span>
-print(scan.summary()); scan.show('./output/goldballs')
+print(scan.summary()); xpt.view_scan(scan)
 scan.save('goldballs.h5')
 
 <span class="c"># script two: reconstruct</span>
@@ -88,7 +89,7 @@ model = xpt.PtychoModel.from_scan(scan, probe_modes=2)
 model.set_params(object_data_fit=0.5, probe_data_fit=0.6, probe_weight_exponent=1.25,
                  relaxation=0.5, mode_schedule=[20], initial_probe_distance=0.3e-6)
 recon = model.recon(scan, iterations=200)                            <span class="c"># probe not given: estimated</span>
-recon.show('./output/goldballs'); recon.save('./output/goldballs/recon.h5')</pre>
+xpt.view_sample(recon, region=VIEW_REGION); recon.save('./output/goldballs/recon.h5')</pre>
 
 <h3>Several GPUs</h3>
 <pre>model.configure_devices(num_devices=4)                               <span class="c"># default: every GPU present</span>
@@ -110,9 +111,11 @@ print(model.data_error(scan, recon.object, recon.probe))</pre>
 <div class="frame">
 <table class="t">
   <tr><th>name</th><th>what it is</th></tr>
-  <tr><td>Scan</td><td>the measurement: frames, recorded positions, instrument facts. <code>Scan.load(path)</code>, <code>scan.save(path)</code>, <code>scan.summary()</code>, <code>scan.show(dir)</code>, <code>scan.positions</code>, <code>scan.num_frames</code>, <code>scan.frame_shape</code></td></tr>
+  <tr><td>Scan</td><td>the measurement: frames, recorded positions, instrument facts. <code>Scan.load(path)</code>, <code>scan.save(path)</code>, <code>scan.summary()</code>, <code>scan.positions</code>, <code>scan.num_frames</code>, <code>scan.frame_shape</code></td></tr>
   <tr><td>PtychoModel</td><td>the parameters and the forward model; the <a href="objects.html">objects page</a>, section 2, lists every method</td></tr>
-  <tr><td>Sample</td><td>an object and the probe it was seen with; a ground truth or what <code>recon</code> returns: <code>object</code>, <code>probe</code>, <code>pixel_pitch</code>, <code>origin</code>, <code>name</code>, <code>mode_energies</code>, and <code>run</code> for an estimate (<code>run.parameters</code>, <code>run.data_error</code>, <code>run.iterations</code>, <code>run.positions</code>, <code>run.coverage</code>); <code>summary()</code>, <code>show()</code>, <code>save(path)</code>, <code>Sample.load(path)</code></td></tr>
+  <tr><td>Sample</td><td>an object and the probe it was seen with; a ground truth or what <code>recon</code> returns: <code>object</code>, <code>probe</code>, <code>pixel_pitch</code>, <code>origin</code>, <code>name</code>, <code>mode_energies</code>, and <code>run</code> for an estimate (<code>run.parameters</code>, <code>run.data_error</code>, <code>run.iterations</code>, <code>run.positions</code>, <code>run.coverage</code>); <code>summary()</code>, <code>save(path)</code>, <code>Sample.load(path)</code></td></tr>
+  <tr><td>view_scan(scan), view_sample(sample, region, compare_to, compare_label)</td><td>viewing, separate from the objects: each makes figures, puts them on the screen, and returns them. <code>region</code> is the part of the object to show, chosen in the script; with none given, the rectangle spanned by the probe centers. The windows zoom and pan with the mouse.</td></tr>
+  <tr><td>save_figures(figures, directory)</td><td>write the figures a view returned to PNG files</td></tr>
   <tr><td>download(url, directory)</td><td>download a file into a directory unless it is already there; returns the local path</td></tr>
   <tr><td>scan_positions(grid, step, max_offset, seed)</td><td>positions of a rectangular scan with random offsets, in meters</td></tr>
   <tr><td>fetch(name)</td><td>download a named public dataset once; returns the local path of the raw file</td></tr>
@@ -136,6 +139,7 @@ print(model.data_error(scan, recon.object, recon.probe))</pre>
   <tr><td>relaxation</td><td><span class="kind k-par">recon</span></td><td>\(\rho\); default 0.5</td></tr>
   <tr><td>mode_schedule</td><td><span class="kind k-par">recon</span></td><td>iterations at which a mode is added; default none</td></tr>
   <tr><td>mode_energy_fraction</td><td><span class="kind k-par">recon</span></td><td>\(f\); default 0.05</td></tr>
+  <tr><td>orthogonalize_modes</td><td><span class="kind k-par">recon</span></td><td>make the modes orthogonal each time a mode is added; default off</td></tr>
   <tr><td>initial_probe_distance</td><td><span class="kind k-par">recon</span></td><td>Fresnel distance for the initial probe and new modes, meters; default none (no propagation)</td></tr>
   <tr><td>num_devices, devices</td><td><span class="kind k-comp">compute_params</span></td><td>arguments of <code>configure_devices</code>: how many GPUs, or which; see <a href="computing.html">Computing</a>, section 4</td></tr>
 </table>

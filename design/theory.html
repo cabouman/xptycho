@@ -222,6 +222,7 @@ table.params th { font-size: 12px; letter-spacing: 0.06em; text-transform: upper
   <li><b>Rescale everything</b>: every mode \(d_k\) and every copy \(s_{j,k}\), \(k = 0 \ldots K\), is divided by \(\sqrt{1+f}\), so the total energy is \(E\) again.</li>
   <li>\(K \leftarrow K+1\). The energy weights \(w_k\) follow from the new modes.</li>
 </ol>
+<p><b>Orthogonal modes, optional</b> (<code>orthogonalize_modes</code>, off by default; <code>orthogonalize_images</code> in the code). Right after the addition, the modes are replaced by an orthogonal set. With the modes as the columns of a matrix \(D = [d_0 \cdots d_{K-1}]\) and its singular value decomposition \(D = U S V^H\), the new modes are the columns of \(U S\), in order of decreasing energy, and every per-position copy \(s_{j,k}\) is set to the new \(d_k\). Since \(U S = D V\) with \(V\) unitary, the new modes predict the same intensities \(\sum_k |\mathcal{F} D_k p_j|^2\) as the old ones. The 2025 paper's software uses this step in the two-mode reconstruction of the gold-ball data and not in the synthetic experiments.</p>
 
 <h2>6. The facts that matter for code</h2>
 <ol class="facts">
@@ -243,6 +244,7 @@ table.params th { font-size: 12px; letter-spacing: 0.06em; text-transform: upper
   <tr><td><code>initial_probe_distance</code></td><td>\(z\)</td><td>Fresnel propagation distance in the probe initialization and in adding a mode (sections 4 and 5)</td></tr>
   <tr><td><code>probe_modes</code></td><td>\(K\)</td><td>number of probe modes (a forward-model parameter; the rest of this table are reconstruction parameters)</td></tr>
   <tr><td><code>mode_energy_fraction</code></td><td>\(f\)</td><td>fraction of the probe energy given to a newly added mode (section 5; 0.05)</td></tr>
+  <tr><td><code>orthogonalize_modes</code></td><td></td><td>make the modes orthogonal each time a mode is added (section 5; off)</td></tr>
 </table>
 <p>The 2025 paper's values: \(\rho = 0.5\), \(\kappa = 1.25\), \(\alpha_2 = 0.6\), and \(\alpha_1 = 0.6\) with one mode or \(0.5\) with two. These names are the current proposal and may change with the design.</p>
 

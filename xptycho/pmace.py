@@ -246,6 +246,20 @@ class Run:
             self.s[g] = torch.cat([self.s[g], copies]) * scale
         self._set_modes(modes)
 
+    def orthogonalize_modes(self):
+        """Replace the probe modes by an orthogonal set that predicts the
+        same intensities, and set every per-position copy to the new modes.
+
+        The modes are the columns of a matrix ``D``.  With the singular
+        value decomposition ``D = U S V^H``, the new modes are the columns
+        of ``U S``, in order of decreasing energy."""
+        modes = self.modes.cpu().numpy().astype(np.complex128)
+        u, s, _ = np.linalg.svd(modes.reshape(len(modes), -1).T, full_matrices=False)
+        new = torch.as_tensor((u * s).T.reshape(modes.shape).astype(np.complex64), device=self.modes.device)
+        for g, device in enumerate(self.layout.devices):
+            self.s[g] = new.to(device)[:, None].repeat(1, len(self.starts[g]), 1, 1)
+        self._set_modes(new)
+
     # ------------------------------------------------------------ reporting
     def data_error(self):
         """Step 7: the normalized root mean square difference between the

@@ -26,8 +26,8 @@ def download(url, directory):
     try:
         urllib.request.urlretrieve(url, partial)
     except urllib.error.URLError:
-        # Some servers do not send their intermediate certificate, which
-        # Python cannot verify without it; curl can.
+        # Some servers refuse Python's downloader or do not send their
+        # intermediate certificate, which Python cannot verify; curl works.
         result = subprocess.run(['curl', '-L', '--fail', '-sS', '-o', partial, url], capture_output=True, text=True)
         if result.returncode != 0:
             raise RuntimeError('could not download {}: {}'.format(url, result.stderr.strip()))

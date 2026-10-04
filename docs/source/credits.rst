@@ -38,6 +38,20 @@ Two conference papers give earlier and shorter accounts.
     and Computers, pp. 1694-1698, 2021
     <https://doi.org/10.1109/IEEECONF53345.2021.9723357>`_.
 
+Data
+----
+
+The measured data of the demos is the gold-ball scan collected by Stefano
+Marchesini and colleagues at beamline 5.3.2.1 of the Advanced Light Source,
+Lawrence Berkeley National Laboratory, and published in the Coherent X-ray
+Imaging Data Bank under the CC0 public domain dedication.  Please cite it
+when you use it.
+
+    Stefano Marchesini et al., "Ptychography Gold Ball Example Dataset,"
+    `Coherent X-ray Imaging Data Bank, CXIDB ID 65, 2017
+    <https://www.cxidb.org/id-65.html>`_,
+    `doi:10.11577/1454414 <https://doi.org/10.11577/1454414>`_.
+
 Development
 -----------
 

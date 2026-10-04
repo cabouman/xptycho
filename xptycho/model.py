@@ -19,6 +19,7 @@ RECON_DEFAULTS = {
     'relaxation': (0.5, ''),
     'mode_schedule': ((), 'iterations'),
     'mode_energy_fraction': (0.05, ''),
+    'orthogonalize_modes': (False, ''),
     'initial_probe_distance': (None, 'm'),
     'object_shape': (None, 'pixels'),
     'object_origin': (None, 'm'),
@@ -468,6 +469,8 @@ class PtychoModel:
             if estimate:
                 if iteration in schedule:
                     run.add_mode(self.wavelength, self._recon['initial_probe_distance'], self.pixel_pitch)
+                    if self._recon['orthogonalize_modes']:
+                        run.orthogonalize_modes()
                     if verbose:
                         print('iteration {}: mode {} added, {:g}% of the energy'.format(
                             iteration, len(run.modes), 100 * self._recon['mode_energy_fraction']))

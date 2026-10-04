@@ -15,8 +15,10 @@ from .scan import Scan, energy_to_wavelength
 from .model import PtychoModel
 from .sample import Sample, RunRecord
 from .metrics import nrmse, match_scale
+from .view import view_scan, view_sample, save_figures
 from .datasets import download, scan_positions
 from . import operators
+from . import preprocess
 
-__all__ = ['Scan', 'PtychoModel', 'Sample', 'RunRecord', 'download', 'scan_positions', 'nrmse',
-           'match_scale', 'energy_to_wavelength', 'operators']
+__all__ = ['Scan', 'PtychoModel', 'Sample', 'RunRecord', 'download', 'scan_positions', 'view_scan', 'view_sample', 'save_figures', 'nrmse',
+           'match_scale', 'energy_to_wavelength', 'operators', 'preprocess']

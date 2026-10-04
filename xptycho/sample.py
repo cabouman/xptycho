@@ -126,23 +126,6 @@ class Sample:
                 lines.append('  final data error: {:.6f}'.format(self.run.data_error[-1]))
         return '\n'.join(lines)
 
-    def show(self, directory=None, compare_to=None, block=True):
-        """Plot the magnitude and phase of the object and the probe modes,
-        and for an estimate the data error at each iteration, each with a
-        caption, and put the figures on the screen.
-
-        Args:
-            directory (str, optional): where the figures are also saved, as
-                ``object.png``, ``probe.png``, and ``data_error.png``.
-            compare_to (Sample, optional): a known sample.  Adds its object
-                to the object figure and reports the NRMSE of the object
-                inside :meth:`scanned_region`.
-            block (bool, optional): wait until the windows are closed.
-                Defaults to True.
-        """
-        from .view import show_sample
-        show_sample(self, directory, compare_to, block)
-
     def save(self, path):
         """Write the sample to the group ``/sample`` of an HDF5 file, and
         the record of the run, when there is one, to ``/run``.  A file that
