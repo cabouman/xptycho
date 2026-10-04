@@ -93,26 +93,43 @@ Three objects
 Speed
 -----
 
-Measured on one Apple laptop, the new code on its GPU against the reference
-code ``ptycho_pmace`` on its CPU, with the same data, parameters, and number of
-iterations.  The two give the same result to within rounding.
+**The time falls in proportion to the number of GPUs.**  Each entry is the time
+for the whole run and its speedup over the reference code ``ptycho_pmace``,
+with the same data, parameters, and number of iterations.  The results agree
+with the reference code to within rounding.
 
 .. list-table::
    :header-rows: 1
-   :widths: 46 18 18 18
+   :widths: 30 14 14 14 14 14
 
    * - case
-     - reference code
-     - xptycho
-     - ratio
+     - | reference code
+       | Apple laptop CPU
+     - | xptycho
+       | Apple laptop GPU
+     - | xptycho
+       | 1 NVIDIA H100
+     - | xptycho
+       | 2 NVIDIA H100
+     - | xptycho
+       | 4 NVIDIA H100
    * - gold balls, 794 frames of 512 x 512, known probe, 100 iterations
      - 30 min
-     - 3 min
-     - 10
+     - | 3 min
+       | 10x speedup
+     - | 16.1 s
+       | 112x speedup
+     - | 8.0 s
+       | 225x speedup
+     - | 4.2 s
+       | 428x speedup
    * - synthetic, 400 frames of 256 x 256, probe estimated, two modes, 200 iterations
      - 26 min
-     - 53 s
-     - 29
+     - | 53 s
+       | 29x speedup
+     - NA
+     - NA
+     - NA
 
 Scale
 -----
