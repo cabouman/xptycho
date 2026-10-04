@@ -33,9 +33,9 @@ def make_positions():
 
 def make_model(devices=('cpu',), **recon_params):
     """A model of the tiny problem on the 64 x 64 grid of the baseline."""
-    model = xpt.PtychoModel(wavelength=WAVELENGTH, detector_distance=DISTANCE,
-                            detector_pitch=WAVELENGTH * DISTANCE / (PROBE_SIZE * PIXEL_PITCH),
-                            frame_size=PROBE_SIZE, positions=make_positions())
+    model = xpt.PtychoModel(wavelength=WAVELENGTH, det_distance=DISTANCE,
+                            det_pixel_pitch=WAVELENGTH * DISTANCE / (PROBE_SIZE * PIXEL_PITCH),
+                            frame_size=PROBE_SIZE, probe_positions=make_positions())
     model.set_params(object_shape=(OBJECT_SIZE, OBJECT_SIZE), object_origin=(0.0, 0.0), **recon_params)
     model.configure_devices(devices=list(devices))
     return model

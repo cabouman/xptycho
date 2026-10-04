@@ -49,19 +49,19 @@ def main():
     probe = load('init_probe') if blind else load('ref_probe')
     n = y.shape[-1]
 
-    positions = (bounds[:, [0, 2]] + n // 2) * PIXEL_PITCH
-    detector_pitch = WAVELENGTH * DISTANCE / (n * PIXEL_PITCH)
+    probe_positions = (bounds[:, [0, 2]] + n // 2) * PIXEL_PITCH
+    det_pixel_pitch = WAVELENGTH * DISTANCE / (n * PIXEL_PITCH)
     if blind and params.get('add_mode'):
         # Mode addition uses the true wavelength and pixel pitch.
         global_pixel, wavelength = params['sampling_interval'], params['wavelength']
-        positions = (bounds[:, [0, 2]] + n // 2) * global_pixel
-        detector_pitch = wavelength * DISTANCE / (n * global_pixel)
+        probe_positions = (bounds[:, [0, 2]] + n // 2) * global_pixel
+        det_pixel_pitch = wavelength * DISTANCE / (n * global_pixel)
     else:
         wavelength = WAVELENGTH
-    model = xpt.PtychoModel(wavelength=wavelength, detector_distance=DISTANCE, detector_pitch=detector_pitch,
-                            frame_size=n, positions=positions,
-                            probe_modes=params.get('num_modes_final', 1 if probe.ndim == 2 else len(probe)))
-    print('pixel pitch {:.3g} m, wavelength {:.3g} m'.format(model.pixel_pitch, model.wavelength))
+    model = xpt.PtychoModel(wavelength=wavelength, det_distance=DISTANCE, det_pixel_pitch=det_pixel_pitch,
+                            frame_size=n, probe_positions=probe_positions,
+                            num_probe_modes=params.get('num_modes_final', 1 if probe.ndim == 2 else len(probe)))
+    print('pixel pitch {:.3g} m, wavelength {:.3g} m'.format(model.sample_pixel_pitch, model.wavelength))
     model.set_params(object_shape=init_obj.shape, object_origin=(0.0, 0.0),
                      object_data_fit=params['obj_data_fit_prm'], relaxation=params['rho'],
                      probe_weight_exponent=params['probe_exp'])
@@ -88,7 +88,7 @@ def main():
         run.update_object()
         if blind:
             if iteration in schedule:
-                run.add_mode(model.wavelength, model._recon['initial_probe_distance'], model.pixel_pitch)
+                run.add_mode(model.wavelength, model._recon['initial_probe_distance'], model.sample_pixel_pitch)
                 if iteration in params.get('orthogonalize_modes', []):
                     run.orthogonalize_modes()
             run.update_probe()

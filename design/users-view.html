@@ -58,10 +58,10 @@ table.t td:first-child { font-family: var(--mono); font-size: 13px; white-space:
 
 TRUTH_URL = 'https://www.datadepot.rcac.purdue.edu/bouman/data/demo_xptycho_synthetic.h5'
 truth = xpt.Sample.load(xpt.download(TRUTH_URL, './demo/input'))   <span class="c"># a Sample: truth.object, truth.probe, truth.pixel_pitch</span>
-positions = xpt.scan_positions(grid=(12, 12), step=1.02e-6, max_offset=0.3e-6, seed=0)
+probe_positions = xpt.scan_positions(grid=(12, 12), step=1.02e-6, max_offset=0.3e-6, seed=0)
 
-model = xpt.PtychoModel(energy=8.8, detector_distance=2.0, detector_pitch=75e-6,
-                        frame_size=256, positions=positions, probe_modes=1)
+model = xpt.PtychoModel(energy=8.8, det_distance=2.0, det_pixel_pitch=75e-6,
+                        frame_size=256, probe_positions=positions, num_probe_modes=1)
 scan = model.simulate(truth, peak_photons=1e4, seed=0)
 print(scan.summary())
 
@@ -79,13 +79,13 @@ recon.save('./output/demo_1/recon.h5')</pre>
 <pre><span class="c"># script one: raw file to scan file</span>
 path = xpt.fetch('goldballs_cxi')                                    <span class="c"># entry 65 of the CXI database, cxidb.org; downloaded once</span>
 scan = xpt.preprocess(path, dark='mean_of_dark_frames', crop=512, apodization='tukey',
-                      energy=1.0, detector_distance=0.112)         <span class="c"># positions and detector pitch come from the file</span>
+                      energy=1.0, det_distance=0.112)         <span class="c"># positions and detector pitch come from the file</span>
 print(scan.summary()); xpt.view_scan(scan)
 scan.save('goldballs.h5')
 
 <span class="c"># script two: reconstruct</span>
 scan = xpt.Scan.load('goldballs.h5')
-model = xpt.PtychoModel.from_scan(scan, probe_modes=2)
+model = xpt.PtychoModel.from_scan(scan, num_probe_modes=2)
 model.set_params(object_data_fit=0.5, probe_data_fit=0.6, probe_weight_exponent=1.25,
                  relaxation=0.5, mode_schedule=[20], initial_probe_distance=0.3e-6)
 recon = model.recon(scan, iterations=200)                            <span class="c"># probe not given: estimated</span>
@@ -97,10 +97,10 @@ recon = model.recon(scan, iterations=200)                            <span class
 
 <h3>Continue a finished run, and refine positions</h3>
 <pre>scan = xpt.Scan.load('goldballs.h5')
-model = xpt.PtychoModel.from_scan(scan, probe_modes=2)
+model = xpt.PtychoModel.from_scan(scan, num_probe_modes=2)
 recon = xpt.Sample.load('./output/goldballs/recon.h5')
-new_pos, misfit = model.refine_positions(scan, recon.object, recon.probe, max_shift=1)
-model.set_params(positions=new_pos)
+new_pos, misfit = model.refine_probe_positions(scan, recon.object, recon.probe, max_shift=1)
+model.set_params(probe_positions=new_pos)
 recon = model.recon(scan, init=recon, iterations=100)</pre>
 
 <h3>The forward model alone</h3>
@@ -111,9 +111,9 @@ print(model.data_error(scan, recon.object, recon.probe))</pre>
 <div class="frame">
 <table class="t">
   <tr><th>name</th><th>what it is</th></tr>
-  <tr><td>Scan</td><td>the measurement: frames, recorded positions, instrument facts. <code>Scan.load(path)</code>, <code>scan.save(path)</code>, <code>scan.summary()</code>, <code>scan.positions</code>, <code>scan.num_frames</code>, <code>scan.frame_shape</code></td></tr>
+  <tr><td>Scan</td><td>the measurement: frames, recorded positions, instrument facts. <code>Scan.load(path)</code>, <code>scan.save(path)</code>, <code>scan.summary()</code>, <code>scan.probe_positions</code>, <code>scan.num_frames</code>, <code>scan.frame_shape</code></td></tr>
   <tr><td>PtychoModel</td><td>the parameters and the forward model; the <a href="objects.html">objects page</a>, section 2, lists every method</td></tr>
-  <tr><td>Sample</td><td>an object and the probe it was seen with; a ground truth or what <code>recon</code> returns: <code>object</code>, <code>probe</code>, <code>pixel_pitch</code>, <code>origin</code>, <code>name</code>, <code>mode_energies</code>, and <code>run</code> for an estimate (<code>run.parameters</code>, <code>run.data_error</code>, <code>run.iterations</code>, <code>run.positions</code>, <code>run.coverage</code>); <code>summary()</code>, <code>save(path)</code>, <code>Sample.load(path)</code></td></tr>
+  <tr><td>Sample</td><td>an object and the probe it was seen with; a ground truth or what <code>recon</code> returns: <code>object</code>, <code>probe</code>, <code>pixel_pitch</code>, <code>origin</code>, <code>name</code>, <code>mode_energies</code>, and <code>run</code> for an estimate (<code>run.parameters</code>, <code>run.data_error</code>, <code>run.iterations</code>, <code>run.probe_positions</code>, <code>run.coverage</code>); <code>summary()</code>, <code>save(path)</code>, <code>Sample.load(path)</code></td></tr>
   <tr><td>view_scan(scan), view_sample(sample, region, compare_to, compare_label)</td><td>viewing, separate from the objects: each makes figures, puts them on the screen, and returns them. <code>region</code> is the part of the object to show, chosen in the script; with none given, the rectangle spanned by the probe centers. The windows zoom and pan with the mouse.</td></tr>
   <tr><td>save_figures(figures, directory)</td><td>write the figures a view returned to PNG files</td></tr>
   <tr><td>download(url, directory)</td><td>download a file into a directory unless it is already there; returns the local path</td></tr>
@@ -129,11 +129,11 @@ print(model.data_error(scan, recon.object, recon.probe))</pre>
 <table class="t">
   <tr><th>name</th><th>kind</th><th>meaning</th></tr>
   <tr><td>energy / wavelength</td><td><span class="kind k-fm">fmodel</span></td><td>keV, or meters</td></tr>
-  <tr><td>detector_distance</td><td><span class="kind k-fm">fmodel</span></td><td>meters, object to detector</td></tr>
-  <tr><td>detector_pitch</td><td><span class="kind k-fm">fmodel</span></td><td>meters, after any binning</td></tr>
+  <tr><td>det_distance</td><td><span class="kind k-fm">fmodel</span></td><td>meters, object to detector</td></tr>
+  <tr><td>det_pixel_pitch</td><td><span class="kind k-fm">fmodel</span></td><td>meters, after any binning</td></tr>
   <tr><td>frame_size</td><td><span class="kind k-fm">fmodel</span></td><td>\(N_p\), detector pixels per side</td></tr>
-  <tr><td>positions</td><td><span class="kind k-fm">fmodel</span></td><td>(J, 2), row then column, meters; settable, for refinement</td></tr>
-  <tr><td>probe_modes</td><td><span class="kind k-fm">fmodel</span></td><td>\(K\)</td></tr>
+  <tr><td>probe_positions</td><td><span class="kind k-fm">fmodel</span></td><td>(J, 2), row then column, meters; settable, for refinement</td></tr>
+  <tr><td>num_probe_modes</td><td><span class="kind k-fm">fmodel</span></td><td>\(K\)</td></tr>
   <tr><td>object_data_fit, probe_data_fit</td><td><span class="kind k-par">recon</span></td><td>\(\alpha_1\), \(\alpha_2\); defaults 0.6, 0.6</td></tr>
   <tr><td>probe_weight_exponent</td><td><span class="kind k-par">recon</span></td><td>\(\kappa\); default 1.25</td></tr>
   <tr><td>relaxation</td><td><span class="kind k-par">recon</span></td><td>\(\rho\); default 0.5</td></tr>

@@ -18,7 +18,7 @@ import xptycho as xpt
 # The instrument.  The detector distance is set below so that the object
 # pixel of the model equals the pixel pitch the ground truth was made at.
 WAVELENGTH = 1.4e-9             # m
-DETECTOR_PITCH = 75e-6          # m
+DET_PIXEL_PITCH = 75e-6          # m
 FRAME_SIZE = 256                # detector pixels per side
 
 # The scan, in units of the object pixel of the ground truth.
@@ -29,7 +29,7 @@ PEAK_PHOTONS = 1e4              # photons at the brightest detector pixel
 SEED = 0
 
 # The reconstruction.
-PROBE_MODES = 2
+NUM_PROBE_MODES = 2
 ITERATIONS = 200
 OBJECT_DATA_FIT = 0.5           # alpha_1 in the papers
 PROBE_DATA_FIT = 0.6            # alpha_2
@@ -45,17 +45,19 @@ DATA_DIR = './demo/input'
 OUTPUT_DIR = './demo/output/demo_2_simulated_blind_two_modes'
 # --------------------------------------------------------------------
 
-# Download the ground truth, unless it is already in DATA_DIR, and load it.
-# It is a Sample: the 1078 x 1078 complex object and the two 256 x 256 probe
-# modes of the 2025 blind multi-mode PMACE paper.
+# Download the synthetic ground truth sample consisting of:
+# A 1078 x 1078 complex object; two 256 x 256 complex probes; the assumed pixel pitch
 truth = xpt.Sample.load(xpt.download(TRUTH_URL, DATA_DIR))
 pixel_pitch = truth.pixel_pitch
 
-positions = xpt.scan_positions(SCAN_GRID, SCAN_STEP_PIXELS * pixel_pitch, MAX_OFFSET_PIXELS * pixel_pitch, seed=SEED)
-detector_distance = pixel_pitch * FRAME_SIZE * DETECTOR_PITCH / WAVELENGTH
-model = xpt.PtychoModel(wavelength=WAVELENGTH, detector_distance=detector_distance,
-                        detector_pitch=DETECTOR_PITCH, frame_size=FRAME_SIZE, positions=positions,
-                        probe_modes=PROBE_MODES)
+# Calculate the scan positions and resulting detector distance.
+probe_positions = xpt.scan_positions(SCAN_GRID, SCAN_STEP_PIXELS * pixel_pitch, MAX_OFFSET_PIXELS * pixel_pitch, seed=SEED)
+det_distance = pixel_pitch * FRAME_SIZE * DET_PIXEL_PITCH / WAVELENGTH
+
+# Create a model with the assumed geometry parameters.
+model = xpt.PtychoModel(wavelength=WAVELENGTH, det_distance=det_distance,
+                        det_pixel_pitch=DET_PIXEL_PITCH, frame_size=FRAME_SIZE, probe_positions=probe_positions,
+                        num_probe_modes=NUM_PROBE_MODES)
 model.set_params(object_shape=truth.object.shape)
 
 # Simulate the scan from the true object and both true modes.

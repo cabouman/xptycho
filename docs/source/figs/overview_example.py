@@ -13,7 +13,7 @@ SCAN_STEP_PIXELS = 8
 MAX_OFFSET_PIXELS = 1.5
 PIXEL_PITCH = 1e-8               # m
 WAVELENGTH = 1e-10              # m
-DETECTOR_PITCH = 75e-6          # m
+DET_PIXEL_PITCH = 75e-6          # m
 PEAK_PHOTONS = 1e5
 ITERATIONS = 100
 # --------------------------------------------------------------------------
@@ -37,10 +37,10 @@ def make_probe(m):
 
 
 truth, probe = make_object(OBJECT_SIZE), make_probe(FRAME_SIZE)
-positions = xpt.scan_positions(SCAN_GRID, SCAN_STEP_PIXELS * PIXEL_PITCH, MAX_OFFSET_PIXELS * PIXEL_PITCH)
-model = xpt.PtychoModel(wavelength=WAVELENGTH, detector_pitch=DETECTOR_PITCH, frame_size=FRAME_SIZE,
-                        detector_distance=PIXEL_PITCH * FRAME_SIZE * DETECTOR_PITCH / WAVELENGTH,
-                        positions=positions)
+probe_positions = xpt.scan_positions(SCAN_GRID, SCAN_STEP_PIXELS * PIXEL_PITCH, MAX_OFFSET_PIXELS * PIXEL_PITCH)
+model = xpt.PtychoModel(wavelength=WAVELENGTH, det_pixel_pitch=DET_PIXEL_PITCH, frame_size=FRAME_SIZE,
+                        det_distance=PIXEL_PITCH * FRAME_SIZE * DET_PIXEL_PITCH / WAVELENGTH,
+                        probe_positions=probe_positions)
 model.set_params(object_shape=truth.shape)
 model.configure_devices(devices=['cpu'])
 scan = model.simulate(xpt.Sample(truth, probe, PIXEL_PITCH), peak_photons=PEAK_PHOTONS)
@@ -53,7 +53,7 @@ estimate = xpt.match_scale(recon.object, truth, region)
 limits = dict(vmin=np.angle(truth[window]).min(), vmax=np.angle(truth[window]).max(), cmap='gray')
 
 fig, axes = plt.subplots(1, 4, figsize=(13, 3.6))
-panels = [(np.log10(scan.frames[len(positions) // 2] + 1), 'one of {} frames\nlog10(counts + 1)'.format(len(positions)), dict(cmap='viridis')),
+panels = [(np.log10(scan.frames[len(probe_positions) // 2] + 1), 'one of {} frames\nlog10(counts + 1)'.format(len(probe_positions)), dict(cmap='viridis')),
           (np.angle(estimate[window]), 'reconstructed phase (rad)\nfrom the frames alone', limits),
           (np.angle(truth[window]), 'true phase (rad)', limits),
           (np.abs(recon.probe[0]), 'estimated probe\nmagnitude', dict(cmap='gray'))]

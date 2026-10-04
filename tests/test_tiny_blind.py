@@ -22,7 +22,7 @@ def setup(devices):
                        probe_weight_exponent=BASELINE['probe_exp'], mode_schedule=BASELINE['add_mode'],
                        mode_energy_fraction=BASELINE['energy_ratio'],
                        initial_probe_distance=BASELINE['propagation_dist'])
-    model.probe_modes = 2
+    model.num_probe_modes = 2
     return model, model.simulate(xpt.Sample(truth, modes, PIXEL_PITCH)), truth
 
 

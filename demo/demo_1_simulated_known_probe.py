@@ -19,7 +19,7 @@ import xptycho as xpt
 # The instrument.  The detector distance is set below so that the object
 # pixel of the model equals the pixel pitch the ground truth was made at.
 ENERGY = 8.8                    # keV
-DETECTOR_PITCH = 75e-6          # m
+DET_PIXEL_PITCH = 75e-6          # m
 FRAME_SIZE = 256                # detector pixels per side
 
 # The scan, in units of the object pixel of the ground truth.
@@ -48,10 +48,10 @@ OUTPUT_DIR = './demo/output/demo_1_simulated_known_probe'
 truth = xpt.Sample.load(xpt.download(TRUTH_URL, DATA_DIR))
 pixel_pitch = truth.pixel_pitch
 
-positions = xpt.scan_positions(SCAN_GRID, SCAN_STEP_PIXELS * pixel_pitch, MAX_OFFSET_PIXELS * pixel_pitch, seed=SEED)
-detector_distance = pixel_pitch * FRAME_SIZE * DETECTOR_PITCH / xpt.energy_to_wavelength(ENERGY)
-model = xpt.PtychoModel(energy=ENERGY, detector_distance=detector_distance, detector_pitch=DETECTOR_PITCH,
-                        frame_size=FRAME_SIZE, positions=positions)
+probe_positions = xpt.scan_positions(SCAN_GRID, SCAN_STEP_PIXELS * pixel_pitch, MAX_OFFSET_PIXELS * pixel_pitch, seed=SEED)
+det_distance = pixel_pitch * FRAME_SIZE * DET_PIXEL_PITCH / xpt.energy_to_wavelength(ENERGY)
+model = xpt.PtychoModel(energy=ENERGY, det_distance=det_distance, det_pixel_pitch=DET_PIXEL_PITCH,
+                        frame_size=FRAME_SIZE, probe_positions=probe_positions)
 model.set_params(object_shape=truth.object.shape)
 
 # Simulate the scan: the forward model at every position, then Poisson counts.

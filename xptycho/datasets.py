@@ -51,7 +51,7 @@ def scan_positions(grid, step, max_offset=0.0, seed=0):
     """
     rows = (np.arange(grid[0]) - (grid[0] - 1) / 2) * step
     cols = (np.arange(grid[1]) - (grid[1] - 1) / 2) * step
-    positions = np.stack(np.meshgrid(rows, cols, indexing='ij'), axis=-1).reshape(-1, 2)
+    probe_positions = np.stack(np.meshgrid(rows, cols, indexing='ij'), axis=-1).reshape(-1, 2)
     if max_offset:
-        positions = positions + np.random.default_rng(seed).uniform(-max_offset, max_offset, positions.shape)
-    return positions
+        probe_positions = probe_positions + np.random.default_rng(seed).uniform(-max_offset, max_offset, probe_positions.shape)
+    return probe_positions

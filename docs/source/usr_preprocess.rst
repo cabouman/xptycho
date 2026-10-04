@@ -21,8 +21,9 @@ reads a file.
     center = xpp.diffraction_center(frames)
     frames = xpp.crop_frames(frames, center, 512)
     frames = frames * xpp.tukey_window(512, 0.5) ** 2
-    scan = xpt.Scan(frames, positions, wavelength=raw['wavelength'],
-                    detector_distance=raw['detector_distance'], detector_pitch=raw['detector_pitch'])
+    probe_positions = translations[:, [1, 0]]                     # row and column, in meters
+    scan = xpt.Scan(frames, probe_positions, wavelength=raw['wavelength'],
+                    det_distance=raw['det_distance'], det_pixel_pitch=raw['det_pixel_pitch'])
 
 Demo 3 runs these steps on the raw gold-ball file.  On that file they
 reproduce the preprocessed frames of the reference code.

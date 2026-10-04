@@ -23,17 +23,17 @@ class RunRecord:
             ``name``, ``value``, ``units``, and ``origin``.
         data_error (list of float): the data error after each iteration.
         iterations (int): the iterations run.
-        positions (ndarray): float64 ``(J, 2)``, meters, the positions the
+        probe_positions (ndarray): float64 ``(J, 2)``, meters, the positions the
             run used.
         coverage (ndarray): float32 ``(rows, cols)``, the accumulated probe
             weight; zero where no probe reached.
     """
 
-    def __init__(self, parameters, data_error, iterations, positions, coverage):
+    def __init__(self, parameters, data_error, iterations, probe_positions, coverage):
         self.parameters = parameters
         self.data_error = list(data_error)
         self.iterations = int(iterations)
-        self.positions = positions
+        self.probe_positions = probe_positions
         self.coverage = coverage
 
 
@@ -58,7 +58,7 @@ class Sample:
     In a file, a sample is the group ``/sample`` of an HDF5 file, with
     datasets ``object`` and ``probe`` and attributes ``pixel_pitch``,
     ``origin``, and ``name``.  The record of the run is the group ``/run``,
-    with datasets ``coverage``, ``positions``, ``data_error``, and
+    with datasets ``coverage``, ``probe_positions``, ``data_error``, and
     ``parameters`` and the attribute ``iterations``.  The same file may also
     hold a :class:`~xptycho.Scan` in ``/scan``.
     """
@@ -98,7 +98,7 @@ class Sample:
         comparisons with a truth are made inside it.  Needs ``run``."""
         if self.run is None:
             raise ValueError('scanned_region needs the record of a run; this sample has none')
-        centers = (self.run.positions - np.asarray(self.origin)) / self.pixel_pitch
+        centers = (self.run.probe_positions - np.asarray(self.origin)) / self.pixel_pitch
         first = np.floor(centers.min(axis=0)).astype(int)
         last = np.ceil(centers.max(axis=0)).astype(int)
         mask = np.zeros(self.object.shape, dtype=bool)
@@ -145,7 +145,7 @@ class Sample:
             if self.run is not None:
                 r = f.create_group('run')
                 r.create_dataset('coverage', data=self.run.coverage)
-                r.create_dataset('positions', data=self.run.positions)
+                r.create_dataset('probe_positions', data=self.run.probe_positions)
                 r.create_dataset('data_error', data=np.asarray(self.run.data_error, dtype=np.float64))
                 table = [[str(row[c]) for c in PARAMETER_COLUMNS] for row in self.run.parameters]
                 r.create_dataset('parameters', data=np.array(table, dtype=object), dtype=h5py.string_dtype())
@@ -166,7 +166,7 @@ class Sample:
                 table = r['parameters'].asstr()[...]
                 parameters = [dict(zip(PARAMETER_COLUMNS, row)) for row in table]
                 run = RunRecord(parameters, r['data_error'][...].tolist(), r.attrs['iterations'],
-                                r['positions'][...], r['coverage'][...])
+                                r['probe_positions'][...], r['coverage'][...])
             origin = g.attrs.get('origin')
             return cls(g['object'][...], g['probe'][...], float(g.attrs['pixel_pitch']),
                        None if origin is None else tuple(origin), g.attrs.get('name'), run)

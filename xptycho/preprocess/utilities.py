@@ -32,7 +32,7 @@ def find_outlier_frames(frames, threshold=2.0):
 
     Returns:
         ndarray: bool ``(J,)``, True for an outlier.  Remove them with
-        ``frames[~outlier]`` and ``positions[~outlier]``.
+        ``frames[~outlier]`` and the same for their positions.
     """
     means = np.asarray(frames).mean(axis=(1, 2), dtype=np.float64)
     return np.abs(means - means.mean()) > threshold * means.std()

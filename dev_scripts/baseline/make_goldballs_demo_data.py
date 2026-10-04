@@ -35,7 +35,7 @@ outlier = xpp.find_outlier_frames(frames, OUTLIER_THRESHOLD)
 frames, translations = frames[~outlier], raw['translations'][~outlier]
 frames = xpp.crop_frames(frames, xpp.diffraction_center(frames), FRAME_SIZE)
 frames = frames * xpp.tukey_window(FRAME_SIZE, TUKEY_SHAPE) ** 2
-positions = -translations[:, [1, 0]]
+probe_positions = -translations[:, [1, 0]]
 
 # Check: the frames equal those ptycho_pmace reconstructs.
 reference_frames = load('y_meas')
@@ -45,12 +45,12 @@ print('largest amplitude difference from the reference frames: {:.2e} of {:.1f}'
 
 # The reference object is on a grid of its own.  Its origin is placed so that the patch
 # centers of the reference run fall, on average, on the positions recorded in the raw file.
-pixel_pitch = raw['wavelength'] * raw['detector_distance'] / (FRAME_SIZE * raw['detector_pitch'])
+pixel_pitch = raw['wavelength'] * raw['det_distance'] / (FRAME_SIZE * raw['det_pixel_pitch'])
 bounds = load('patch_bounds')
 centers = bounds[:, [0, 2]] + FRAME_SIZE // 2                     # pixels of the reference object
-offset = (centers - positions / pixel_pitch).mean(axis=0)
+offset = (centers - probe_positions / pixel_pitch).mean(axis=0)
 origin = -offset * pixel_pitch
-residual = centers - (positions - origin) / pixel_pitch
+residual = centers - (probe_positions - origin) / pixel_pitch
 print('reference patch centers minus recorded positions: rms {:.2f} pixels, largest {:.2f}'.format(
     np.sqrt((residual ** 2).mean()), np.abs(residual).max()))
 

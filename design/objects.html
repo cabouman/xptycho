@@ -185,7 +185,7 @@ table.where th { font-size: 12px; letter-spacing: 0.06em; text-transform: upperc
     <div class="frame">
     <div class="meths">
       <div class="meth"><code>PtychoModel(…) <em>constructor</em></code><span>Build from the forward-model parameters.</span></div>
-      <div class="meth"><code>PtychoModel.from_scan(scan, probe_modes=1, **overrides) <em>classmethod</em></code><span>Build from the facts a scan file recorded. Any parameter passed overrides the file's value.</span></div>
+      <div class="meth"><code>PtychoModel.from_scan(scan, num_probe_modes=1, **overrides) <em>classmethod</em></code><span>Build from the facts a scan file recorded. Any parameter passed overrides the file's value.</span></div>
       <div class="meth"><code>model.set_params(**p), model.get_params(names)</code><span>Set and read reconstruction parameters and compute settings by name, as in mbirtorch.</span></div>
       <div class="meth"><code>model.configure_devices(num_devices=1, devices=None)</code><span>Choose the devices, as in mbirtorch: a count of GPUs, or an explicit list. Without a call the model chooses automatically. See <a href="computing.html">Computing</a>, section 4.</span></div>
       <div class="meth"><code>model.print_params()</code><span>Print every parameter with its value, units, and origin (given, file, derived, default).</span></div>
@@ -193,7 +193,7 @@ table.where th { font-size: 12px; letter-spacing: 0.06em; text-transform: upperc
       <div class="meth"><code>model.simulate(sample, peak_photons=None, dark_rate=0, seed=0)</code><span>Calls <code>forward</code> on the sample's object and probe, after checking that the sample's <code>pixel_pitch</code> equals the model's, scales the intensities so the brightest detector pixel is <code>peak_photons</code>, draws Poisson counts, and returns a <code>Scan</code> carrying this model's positions and instrument facts. Without <code>peak_photons</code>, the exact intensities.</span></div>
       <div class="meth"><code>model.recon(scan, probe=None, init_probe=None, init=None, iterations=…)</code><span><b>The reconstruction.</b> With <code>probe=</code>, the probe is known and held fixed. Without it, the probe is estimated: from <code>init_probe=</code> when given, else from the data-driven initialization. A given <code>probe=</code> must have all \(K\) modes. An estimate may start with fewer: one mode from the initialization, or however many <code>init_probe=</code> has, and reaches \(K\) by adding a mode at each iteration of <code>mode_schedule</code> (theory page, section 5). The schedule must have enough entries to reach \(K\), or <code>recon</code> refuses before it starts. <code>init=</code> warm-starts both unknowns from a <code>Sample</code>, usually a previous result. <code>iterations</code> is the one setting that changes on every call, so it is an argument here, as mbirtorch's <code>max_iterations</code> is. Returns a <code>Sample</code> with its <code>run</code> record. The run state lives only inside this call.</span></div>
       <div class="meth"><code>model.data_error(scan, x, d)</code><span>The normalized distance between <code>forward(x, d)</code> and the scan's amplitudes. The curve <code>recon</code> reports, available on its own.</span></div>
-      <div class="meth"><code>model.refine_positions(scan, x, d, max_shift=1)</code><span>One refinement pass: for each position, the integer shift within <code>max_shift</code> whose <code>forward</code> best matches the data, given <code>x</code> and <code>d</code>. Returns the refined positions and the per-position misfit. Changes nothing. Section 7.</span></div>
+      <div class="meth"><code>model.refine_probe_positions(scan, x, d, max_shift=1)</code><span>One refinement pass: for each position, the integer shift within <code>max_shift</code> whose <code>forward</code> best matches the data, given <code>x</code> and <code>d</code>. Returns the refined positions and the per-position misfit. Changes nothing. Section 7.</span></div>
       <div class="meth"><code>model.initial_probe(scan), model.initial_object(scan, d)</code><span>The two initialization formulas of the theory page, exposed so a user can look at the starting point. <code>recon</code> calls them when nothing is given.</span></div>
     </div>
     </div>
@@ -220,7 +220,7 @@ table.where th { font-size: 12px; letter-spacing: 0.06em; text-transform: upperc
     <div class="node n-unk"><b>Sample</b>x̂, d̂, and the record of the run</div>
   </div>
 </div>
-<p>Two more uses share the same <code>forward</code>: <code>data_error</code>, and <code>refine_positions</code>, which compares <code>forward</code> at shifted positions against the data. A continued run is another <code>recon</code> call on the same model with <code>init=</code> the previous <code>Sample</code>.</p>
+<p>Two more uses share the same <code>forward</code>: <code>data_error</code>, and <code>refine_probe_positions</code>, which compares <code>forward</code> at shifted positions against the data. A continued run is another <code>recon</code> call on the same model with <code>init=</code> the previous <code>Sample</code>.</p>
 
 <h3>The <code>Sample</code></h3>
 <p>A <code>Sample</code> holds the unknowns and what is needed to read them. One that <code>recon</code> returns also holds <code>run</code>, a record of the run; for a ground truth <code>run</code> is absent. The record is not a new kind of quantity; it is copies and derived values of what the model holds, frozen at the time of the run. Nothing of the run state and nothing of the measured data is in a <code>Sample</code>.</p>
@@ -252,7 +252,7 @@ table.where th { font-size: 12px; letter-spacing: 0.06em; text-transform: upperc
         <li><code>run.parameters</code>: fmodel_params, recon_params, compute_params, each with its origin; the time and the devices</li>
         <li><code>run.data_error</code>: the data error at each iteration</li>
         <li><code>run.iterations</code>: the iterations run</li>
-        <li><code>run.positions</code>: the positions the run used</li>
+        <li><code>run.probe_positions</code>: the positions the run used</li>
         <li><code>run.coverage</code>: the accumulated probe weight; zero where no probe reached</li>
       </ul>
     </div>
@@ -268,21 +268,21 @@ table.where th { font-size: 12px; letter-spacing: 0.06em; text-transform: upperc
 </div>
 
 <h3>How the probe reaches \(K\) modes</h3>
-<p>Mode addition is inside <code>recon</code>. The user sets the target and the timing: \(K\) on the model (<code>probe_modes=2</code>) is how many modes the run ends with; <code>mode_schedule=[20]</code> is the iterations at which a mode is added; <code>mode_energy_fraction</code> is the energy a new mode starts with. <code>recon</code> starts with one mode (or the modes in <code>init_probe=</code>) and at each scheduled iteration runs the six steps of theory section 5. The user sees it in three places: the progress line printed at that iteration ("iteration 20: mode 2 added, 5% of the energy"); the convergence figure, which marks that iteration; and the result, <code>recon.probe</code> of shape \((K, N_p, N_p)\) with <code>recon.mode_energies</code>, the final share of each mode.</p>
+<p>Mode addition is inside <code>recon</code>. The user sets the target and the timing: \(K\) on the model (<code>num_probe_modes=2</code>) is how many modes the run ends with; <code>mode_schedule=[20]</code> is the iterations at which a mode is added; <code>mode_energy_fraction</code> is the energy a new mode starts with. <code>recon</code> starts with one mode (or the modes in <code>init_probe=</code>) and at each scheduled iteration runs the six steps of theory section 5. The user sees it in three places: the progress line printed at that iteration ("iteration 20: mode 2 added, 5% of the energy"); the convergence figure, which marks that iteration; and the result, <code>recon.probe</code> of shape \((K, N_p, N_p)\) with <code>recon.mode_energies</code>, the final share of each mode.</p>
 
 <h2>4. The file format</h2>
 <p>A scan and a sample are groups of an HDF5 file. One file may hold either or both. Each class reads and writes only its own groups and keeps the others, so a simulated dataset can be one file holding the scan and its truth. Lengths are in meters. Only functions named for it touch files: <code>load</code>, <code>save</code>, and <code>download</code>. Every other function takes and returns objects in memory, and the package holds no address, folder, or file name.</p>
 <pre>file.h5                 attribute: format_version
-    /scan               attributes: wavelength, detector_distance, detector_pitch, name
+    /scan               attributes: wavelength, det_distance, det_pixel_pitch, name
         frames          (J, Np, Np) intensities
-        positions       (J, 2), row and column of each probe center
+        probe_positions (J, 2), row and column of each probe center
     /sample             attributes: pixel_pitch, origin, name
         object          complex64 (rows, cols)
         probe           complex64 (K, Np, Np)
     /run                attribute: iterations.  Present for a reconstruction.
         parameters      (N, 4) text: name, value, units, origin
         data_error      (iterations,)
-        positions       (J, 2), the positions the run used
+        probe_positions (J, 2), the positions the run used
         coverage        (rows, cols), the accumulated probe weight</pre>
 <table class="where">
   <tr><th>class</th><th>reads and writes</th></tr>
@@ -293,8 +293,8 @@ table.where th { font-size: 12px; letter-spacing: 0.06em; text-transform: upperc
 <h2>5. The scripts</h2>
 <pre><span class="c"># 1. simulated scan, known probe (TCI 2023, Fig. 6)</span>
 truth = xpt.Sample.load(xpt.download(TRUTH_URL, DATA_DIR))         <span class="c"># a Sample: truth.object, truth.probe, truth.pixel_pitch</span>
-model = xpt.PtychoModel(energy=8.8, detector_distance=L, detector_pitch=p,
-                        frame_size=256, positions=pos, probe_modes=1)
+model = xpt.PtychoModel(energy=8.8, det_distance=L, det_pixel_pitch=p,
+                        frame_size=256, probe_probe_positions=pos, num_probe_modes=1)
 scan = model.simulate(truth, peak_photons=1e4, seed=0)
 model.set_params(object_data_fit=0.6, probe_weight_exponent=1.25, relaxation=0.5)
 model.print_params()
@@ -304,7 +304,7 @@ recon.save(OUTPUT_DIR + '/recon.h5')
 
 <span class="c"># 2. measured scan, blind, two modes (TCI 2025)</span>
 scan = xpt.Scan.load('gold_balls.h5')
-model = xpt.PtychoModel.from_scan(scan, probe_modes=2)             <span class="c"># fmodel_params from the file</span>
+model = xpt.PtychoModel.from_scan(scan, num_probe_modes=2)             <span class="c"># fmodel_params from the file</span>
 model.set_params(object_data_fit=0.5, probe_data_fit=0.6, mode_schedule=[20],
                  initial_probe_distance=0.3e-6)
 model.configure_devices(num_devices=4, batch_size=512)
@@ -330,12 +330,12 @@ recon.save(OUTPUT_DIR + '/recon.h5')</pre>
 <p>Positions are a forward-model parameter, read from the scan file, and in most runs they are accurate enough to leave alone. Sometimes they are not, and the user usually knows which from the instrument. So refinement is a method the user calls, never something <code>recon</code> does on its own.</p>
 <p>The method is Qiuchen's: for each position, try every integer shift within <code>max_shift</code>, run <code>forward</code> at each against the current object and probe, and keep the shift that best matches the measurement. It trusts the current image, so it is called after some iterations, and it costs 9 to 25 forward projections per position per pass.</p>
 <pre>recon = model.recon(scan, iterations=50)
-new_pos, misfit = model.refine_positions(scan, recon.object, recon.probe, max_shift=1)
-model.set_params(positions=new_pos)                       <span class="c"># accept the refined positions</span>
+new_pos, misfit = model.refine_probe_positions(scan, recon.object, recon.probe, max_shift=1)
+model.set_params(probe_positions=new_pos)                       <span class="c"># accept the refined positions</span>
 recon = model.recon(scan, init=recon, iterations=150)     <span class="c"># continue with them</span></pre>
 <ul style="max-width:76ch;font-size:15px">
-  <li><code>refine_positions</code> changes nothing. It returns the refined positions and, per position, how much better the best shift fits than the current one. A user who sees nothing to gain leaves the positions alone.</li>
-  <li>The user accepts a change with <code>set_params(positions=...)</code>. The scan keeps the recorded positions, so the correction is always visible as the difference.</li>
+  <li><code>refine_probe_positions</code> changes nothing. It returns the refined positions and, per position, how much better the best shift fits than the current one. A user who sees nothing to gain leaves the positions alone.</li>
+  <li>The user accepts a change with <code>set_params(probe_positions=...)</code>. The scan keeps the recorded positions, so the correction is always visible as the difference.</li>
   <li>Several rounds are several <code>recon</code> calls, each a warm start from the previous <code>Sample</code>.</li>
 </ul>
 

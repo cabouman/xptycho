@@ -14,7 +14,7 @@ record of the run.  A ground truth is also a :class:`~xptycho.Sample`.  The desi
 .. code-block:: python
 
     scan = xpt.Scan.load('scan.h5')
-    model = xpt.PtychoModel.from_scan(scan, probe_modes=2)
+    model = xpt.PtychoModel.from_scan(scan, num_probe_modes=2)
     model.set_params(object_data_fit=0.5, mode_schedule=[20], initial_probe_distance=0.3e-6)
     recon = model.recon(scan, iterations=200)        # probe not given, so estimated
 
@@ -58,7 +58,7 @@ Set with :meth:`~xptycho.PtychoModel.set_params`, read with
      - The step size of the iteration (:math:`\rho`), between 0 and 1.
    * - ``mode_schedule``
      - none
-     - The iterations at which a probe mode is added, until the probe has ``probe_modes``
+     - The iterations at which a probe mode is added, until the probe has ``num_probe_modes``
        modes.
    * - ``mode_energy_fraction``
      - 0.05
@@ -108,16 +108,16 @@ class reads and writes only its own groups and keeps the others.  Lengths are in
 .. code-block:: text
 
     file.h5                 attribute: format_version
-        /scan               attributes: wavelength, detector_distance, detector_pitch, name
+        /scan               attributes: wavelength, det_distance, det_pixel_pitch, name
             frames          (J, n, n) intensities
-            positions       (J, 2), row and column of each probe center
+            probe_positions (J, 2), row and column of each probe center
         /sample             attributes: pixel_pitch, origin, name
             object          complex64 (rows, cols)
             probe           complex64 (K, n, n)
         /run                attribute: iterations.  Present for a reconstruction.
             parameters      (N, 4) text: name, value, units, origin
             data_error      (iterations,)
-            positions       (J, 2), the positions the run used
+            probe_positions (J, 2), the positions the run used
             coverage        (rows, cols), the accumulated probe weight
 
 Viewing

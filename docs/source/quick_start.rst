@@ -34,17 +34,17 @@ Put your data in two numpy arrays and three numbers:
 - ``frames``: a 3D array with shape ``(positions, size, size)``.  Each frame is a diffraction
   pattern in detector counts, with the dark level subtracted, cropped to an even ``size``
   with the beam at the center.
-- ``positions``: a 2D array with shape ``(positions, 2)``: the row and the column of the
+- ``probe_positions``: a 2D array with shape ``(positions, 2)``: the row and the column of the
   center of the probe on the object at each frame, **in meters**.
-- The photon ``energy`` in keV (or the ``wavelength`` in meters), the ``detector_distance``
-  in meters from the object to the detector, and the ``detector_pitch`` pitch in meters.
+- The photon ``energy`` in keV (or the ``wavelength`` in meters), the ``det_distance``
+  in meters from the object to the detector, and the ``det_pixel_pitch`` pitch in meters.
 
 These go into a :class:`~xptycho.Scan`.  A :class:`~xptycho.PtychoModel` is built from the
 scan, and its :meth:`~xptycho.PtychoModel.recon` method does the reconstruction::
 
     import xptycho as xpt
 
-    scan = xpt.Scan(frames, positions, energy=8.8, detector_distance=2.0, detector_pitch=75e-6)
+    scan = xpt.Scan(frames, probe_positions, energy=8.8, det_distance=2.0, det_pixel_pitch=75e-6)
     print(scan.summary())
     xpt.view_scan(scan)                           # one frame and the map of positions
 
@@ -87,7 +87,7 @@ the curvature of a focused beam and usually helps::
 **Several probe modes.**  A partially coherent beam needs more than one mode.  Say how many
 when you build the model, and at which iterations each extra mode is added::
 
-    model = xpt.PtychoModel.from_scan(scan, probe_modes=2)
+    model = xpt.PtychoModel.from_scan(scan, num_probe_modes=2)
     model.set_params(mode_schedule=[20], initial_probe_distance=2e-6)
     recon = model.recon(scan, iterations=200)
     print(recon.mode_energies)                    # the share of the energy in each mode
@@ -103,11 +103,11 @@ position pulls its patch toward its own frame.  Lower it for noisy data.
     recon = model.recon(scan, init=recon, iterations=100)
 
 **The scan positions.**  If the recorded positions may be off by a pixel or so, test it.
-:meth:`~xptycho.PtychoModel.refine_positions` tries shifted positions and reports how much
+:meth:`~xptycho.PtychoModel.refine_probe_positions` tries shifted positions and reports how much
 each one would improve the fit.  It changes nothing until you accept the result::
 
-    new_positions, gain = model.refine_positions(scan, recon.object, recon.probe)
-    model.set_params(positions=new_positions)
+    new_positions, gain = model.refine_probe_positions(scan, recon.object, recon.probe)
+    model.set_params(probe_positions=new_positions)
     recon = model.recon(scan, init=recon, iterations=100)
 
 **The devices.**  Without a call, every GPU on the node is used.  To choose::

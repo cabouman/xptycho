@@ -28,8 +28,8 @@ def load_raw(path):
         - ``translations``: float64 ``(J, 3)``, meters, the recorded
           ``(x, y, z)`` of the sample at each frame.
         - ``wavelength``: meters, from the recorded photon energy.
-        - ``detector_distance``: meters.
-        - ``detector_pitch``: meters.  The pixels must be square.
+        - ``det_distance``: meters.
+        - ``det_pixel_pitch``: meters.  The pixels must be square.
     """
     with h5py.File(path, 'r') as f:
         detector = f[DETECTOR]
@@ -42,6 +42,6 @@ def load_raw(path):
             dark_frames=detector['data_dark'][...] if 'data_dark' in detector else None,
             translations=np.asarray(f[TRANSLATION][...], dtype=np.float64),
             wavelength=HC_KEV_M / energy_kev,
-            detector_distance=float(detector['distance'][()]),
-            detector_pitch=pitch_x,
+            det_distance=float(detector['distance'][()]),
+            det_pixel_pitch=pitch_x,
         )

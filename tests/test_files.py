@@ -16,7 +16,7 @@ def test_one_file_holds_a_scan_and_a_sample(tmp_path):
     sample, scan_back = xpt.Sample.load(path), xpt.Scan.load(path)
     assert np.array_equal(sample.object, truth.object) and np.array_equal(sample.probe, truth.probe)
     assert sample.pixel_pitch == PIXEL_PITCH and sample.name == 'tiny' and sample.run is None
-    assert np.array_equal(scan_back.frames, scan.frames) and scan_back.detector_pitch == scan.detector_pitch
+    assert np.array_equal(scan_back.frames, scan.frames) and scan_back.det_pixel_pitch == scan.det_pixel_pitch
 
 
 def test_a_reconstruction_keeps_the_record_of_its_run(tmp_path):

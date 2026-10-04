@@ -46,7 +46,7 @@ FRAME_SIZE = 512                # pixels kept about the diffraction center
 TUKEY_SHAPE = 0.5               # fraction of the window inside the taper
 
 # The reconstruction.
-PROBE_MODES = 2
+NUM_PROBE_MODES = 2
 ITERATIONS = 100
 OBJECT_DATA_FIT = 0.5           # alpha_1 in the paper
 PROBE_DATA_FIT = 0.6            # alpha_2
@@ -87,17 +87,17 @@ frames = frames * xpp.tukey_window(FRAME_SIZE, TUKEY_SHAPE) ** 2
 # The recorded translations are (x, y, z) of the sample in meters: rows run along y
 # and columns along x.  With the positions as recorded, the object has the orientation
 # of the SEM image supplied with the data set.
-positions = translations[:, [1, 0]]
+probe_positions = translations[:, [1, 0]]
 
 # The preprocessing ends here: the scan is complete.
-scan = xpt.Scan(frames, positions, wavelength=raw['wavelength'], detector_distance=raw['detector_distance'],
-                detector_pitch=raw['detector_pitch'],
+scan = xpt.Scan(frames, probe_positions, wavelength=raw['wavelength'], det_distance=raw['det_distance'],
+                det_pixel_pitch=raw['det_pixel_pitch'],
                 name='gold balls; data of S. Marchesini et al., CXIDB ID 65, doi:10.11577/1454414')
 print(scan.summary())
 xpt.save_figures(xpt.view_scan(scan), OUTPUT_DIR)          # one frame and the scan positions
 
 # The model takes the instrument facts and the positions from the scan.
-model = xpt.PtychoModel.from_scan(scan, probe_modes=PROBE_MODES)
+model = xpt.PtychoModel.from_scan(scan, num_probe_modes=NUM_PROBE_MODES)
 
 # The starting probe: one mode computed from the data, with no Fresnel propagation.
 init_probe = model.initial_probe(scan)

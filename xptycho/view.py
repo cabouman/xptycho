@@ -81,7 +81,7 @@ def view_scan(scan, frame=None):
     axes[0].set_xticks([])
     axes[0].set_yticks([])
     fig.colorbar(im, ax=axes[0], fraction=0.046)
-    axes[1].plot(scan.positions[:, 1] * 1e6, scan.positions[:, 0] * 1e6, '.', markersize=3)
+    axes[1].plot(scan.probe_positions[:, 1] * 1e6, scan.probe_positions[:, 0] * 1e6, '.', markersize=3)
     axes[1].invert_yaxis()
     axes[1].set_aspect('equal')
     axes[1].set_xlabel('column (micrometers)')
@@ -141,7 +141,7 @@ def view_sample(sample, region=None, compare_to=None, compare_label='truth'):
         facts = {row['name']: row['value'] for row in record.parameters}
         estimated = facts.get('probe') == 'estimated'
         run = '{} positions, {} iterations, probe {}, {} mode{}'.format(
-            len(record.positions), record.iterations, 'estimated' if estimated else 'known', modes, plural)
+            len(record.probe_positions), record.iterations, 'estimated' if estimated else 'known', modes, plural)
 
     # ------------------------------------------------------------ the object
     # The region shown: the one given, else the rectangle of the probe centers, else everything.
