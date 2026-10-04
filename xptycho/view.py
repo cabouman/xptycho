@@ -18,6 +18,10 @@ def show_reconstruction(recon, directory=None, compare_to=None):
     """Plot the object, the probe modes, and the data-error curve of a
     :class:`~xptycho.Reconstruction`.  See its ``show`` method."""
     import matplotlib.pyplot as plt
+    facts = {row['name']: row['value'] for row in recon.params}
+    run = '{} positions, {} iterations, probe {}, {} mode{}'.format(
+        len(recon.positions), recon.iterations, facts.get('probe', ''), len(recon.probe),
+        '' if len(recon.probe) == 1 else 's')
     covered = recon.coverage > 0
     obj = recon.object
     truth = None
@@ -47,14 +51,19 @@ def show_reconstruction(recon, directory=None, compare_to=None):
     if truth is not None:
         _image(axes[1, 0], fig, np.where(covered, np.abs(truth), np.nan), 'truth, magnitude', 'gray', *mag_limits)
         _image(axes[1, 1], fig, np.where(covered, np.angle(truth), np.nan), 'truth, phase (rad)', 'gray', *phase_limits)
+        fig.suptitle('Reconstructed object (top) and truth (bottom), inside the scanned region\n' + run)
+    else:
+        fig.suptitle('Reconstructed object\n' + run)
     fig.tight_layout()
 
     modes = len(recon.probe)
-    fig2, axes2 = plt.subplots(modes, 2, figsize=(8, 4 * modes), squeeze=False)
+    fig2, axes2 = plt.subplots(modes, 2, figsize=(10, 4.5 * modes), squeeze=False)
     for k in range(modes):
         share = 100 * recon.mode_energies[k]
-        _image(axes2[k, 0], fig2, np.abs(recon.probe[k]), 'probe mode {}, magnitude ({:.1f}% of energy)'.format(k, share), 'gray')
-        _image(axes2[k, 1], fig2, np.angle(recon.probe[k]), 'probe mode {}, phase (rad)'.format(k), 'twilight')
+        _image(axes2[k, 0], fig2, np.abs(recon.probe[k]), 'mode {} magnitude, {:.1f}% of energy'.format(k, share), 'gray')
+        _image(axes2[k, 1], fig2, np.angle(recon.probe[k]), 'mode {} phase (rad)'.format(k), 'twilight')
+    fig2.suptitle('{} probe mode{}, one per row\n'.format(
+        'Estimated' if facts.get('probe') == 'estimated' else 'Given', '' if modes == 1 else 's') + run)
     fig2.tight_layout()
 
     fig3, ax3 = plt.subplots(figsize=(6, 4))
@@ -62,6 +71,7 @@ def show_reconstruction(recon, directory=None, compare_to=None):
     ax3.set_xlabel('iteration')
     ax3.set_ylabel('data error')
     ax3.grid(True, which='both', alpha=0.3)
+    ax3.set_title('Data error per iteration\n' + run)
     fig3.tight_layout()
 
     if directory is None:
