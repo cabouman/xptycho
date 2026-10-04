@@ -8,11 +8,6 @@ xptycho is published to PyPI by the GitHub Actions workflow in
 and after you merge it a second command tags the release and publishes it.
 Uploads use Trusted Publishing, so no API token is ever stored or typed.
 
-.. note::
-
-   xptycho has not been released yet, and the one-time setup below has not
-   been done.  Do the one-time setup before the first release.
-
 The examples below release version ``0.1.0``.  Replace ``0.1.0`` with the
 version you are releasing.
 
@@ -27,7 +22,8 @@ until the next release.
 One-time setup
 ==============
 
-These steps are done once for the package and never repeated.
+These steps are done once for the package and never repeated.  They were
+completed for xptycho on 2026-10-03, and are recorded here for reference.
 
 1. On GitHub, open the repository settings and create two environments named
    ``pypi`` and ``testpypi``.  Do not add a required reviewer to either one.
