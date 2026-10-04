@@ -6,7 +6,9 @@ xptycho from the same inputs and prints, at each stored iteration, the
 relative difference between the two objects and the two data errors.
 
 Run in the xptycho environment:
-    python compare_baseline.py <baseline folder> [device,device,...]
+    python compare_baseline.py <baseline folder> [device,device,...] [frames .npy]
+An empty device argument ("") uses the default devices.  The frames file is
+used when the baseline folder has no inputs/y_meas.npy.
 """
 import glob
 import json
@@ -21,7 +23,8 @@ from xptycho.pmace import Run
 
 # ------------------------------- Parameters -------------------------------
 BASELINE = sys.argv[1]
-DEVICES = sys.argv[2].split(',') if len(sys.argv) > 2 else None
+DEVICES = sys.argv[2].split(',') if len(sys.argv) > 2 and sys.argv[2] else None
+FRAMES = sys.argv[3] if len(sys.argv) > 3 else None
 PIXEL_PITCH = 1e-8        # meters; any value, the old code works in pixels
 WAVELENGTH = 1e-10
 DISTANCE = 1.0
@@ -35,9 +38,12 @@ def load(name):
 
 def main():
     params = json.load(open(os.path.join(BASELINE, 'params.json')))
-    if isinstance(params.get('add_mode'), str):        # the captures store lists as text
-        params['add_mode'] = json.loads(params['add_mode'])
+    for key in ('add_mode', 'orthogonalize_modes'):
+        if isinstance(params.get(key), str):           # the captures store lists as text
+            params[key] = json.loads(params[key])
     y, bounds, init_obj = load('y_meas'), load('patch_bounds'), load('init_obj')
+    if y is None:
+        y = np.load(FRAMES)
     ref_obj, window = load('ref_obj'), load('recon_win')
     blind = bool(params.get('joint_recon'))
     probe = load('init_probe') if blind else load('ref_probe')
@@ -83,6 +89,8 @@ def main():
         if blind:
             if iteration in schedule:
                 run.add_mode(model.wavelength, model._recon['initial_probe_distance'], model.pixel_pitch)
+                if iteration in params.get('orthogonalize_modes', []):
+                    run.orthogonalize_modes()
             run.update_probe()
         if iteration in stored:
             mine, old = run.object(), np.load(stored[iteration])
