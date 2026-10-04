@@ -31,8 +31,8 @@ docs = ["sphinx", "sphinx_book_theme", "sphinx-copybutton", "sphinxext-opengraph
 Homepage = "https://github.com/cabouman/xptycho"
 Documentation = "https://xptycho.readthedocs.io"
 
-[tool.setuptools]
-packages = ["xptycho"]
+[tool.setuptools.packages.find]
+include = ["xptycho*"]
 
 [tool.setuptools.dynamic]
 version = { attr = "xptycho.__version__" }
