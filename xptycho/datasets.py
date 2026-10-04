@@ -2,12 +2,14 @@
 against, and simple scan patterns."""
 import json
 import os
+import subprocess
 import tarfile
+import urllib.error
 import urllib.request
 
 import numpy as np
 
-DATA_URL = 'https://engineering.purdue.edu/~bouman/data_repository/data/demo_xptycho_data.tgz'
+DATA_URL = 'https://www.datadepot.rcac.purdue.edu/bouman/data/demo_xptycho_data.tgz'
 DATA_FOLDER = 'demo_xptycho_data'
 
 
@@ -43,9 +45,13 @@ def fetch():
     print('downloading {} to {}'.format(DATA_URL, archive))
     try:
         urllib.request.urlretrieve(DATA_URL, archive)
-    except Exception as error:
-        raise RuntimeError('could not download {}: {}.  Download it by hand and extract it in {}'.format(
-            DATA_URL, error, data_directory()))
+    except urllib.error.URLError:
+        # The data server does not send its intermediate certificate, which
+        # Python cannot verify without it; curl can.
+        result = subprocess.run(['curl', '-L', '--fail', '-sS', '-o', archive, DATA_URL], capture_output=True, text=True)
+        if result.returncode != 0:
+            raise RuntimeError('could not download {}: {}.  Download it by hand and extract it in {}'.format(
+                DATA_URL, result.stderr.strip(), data_directory()))
     with tarfile.open(archive) as tar:
         tar.extractall(data_directory(), filter='data')
     os.remove(archive)
