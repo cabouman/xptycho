@@ -70,12 +70,13 @@ li { margin: 4px 0; }
 
 <div class="goal">
   <b class="g">Goal of this page</b>
-  <p>The design for carrying out the <a href="theory.html">theory page</a>'s iteration on \(N_g\) GPUs of a single node, with all the data held in GPU memory. One GPU is the case \(N_g = 1\) of the same design. It is for the person writing or reviewing <code>recon</code>. It answers four questions:</p>
+  <p>The design for carrying out the <a href="theory.html">theory page</a>'s iteration on \(N_g\) GPUs of a single node, with all the data held in GPU memory. One GPU is the case \(N_g = 1\) of the same design. It is for the person writing or reviewing <code>recon</code>. It answers five questions:</p>
   <ol>
     <li>What does each GPU hold, and how large a scan fits?</li>
     <li>What does each GPU compute, what moves between GPUs, and is the result the same as with one GPU?</li>
     <li>What crosses between the host and the GPUs, and when?</li>
     <li>What does the user set, and what is refused?</li>
+    <li>How closely does the result agree with the old code, and with itself on different devices?</li>
   </ol>
 </div>
 
@@ -144,7 +145,7 @@ li { margin: 4px 0; }
 <div class="frame">
 <table class="t">
   <tr><th>step</th><th>each GPU, over its own positions</th><th>summed to owner</th><th>the owner computes, and windows copy</th></tr>
-  <tr><td>0. start<br>(once)</td><td>add \(\mathcal{F}^* y_j\) into a sum; \(\|y_j\|\) per position</td><td>one probe-sized sum; then the scaled constant patches and their count, as image sums</td><td>\(d^{(0)}\) and \(x^{(0)}\) as on the theory page, section 4; then \(v_j = P_j x^{(0)}\), \(s_{j,k} = d^{(0)}\), and \(\Lambda_k\)</td></tr>
+  <tr><td>0. start<br>(once)</td><td>\(v_j = P_j x^{(0)}\), cut from its window; \(s_{j,k} = d^{(0)}_k\); add \(|d_k|^\kappa\) at each position into an image sum per mode</td><td>\(K\) image sums</td><td>\(\Lambda_k\). The starting probe \(d^{(0)}\) and object \(x^{(0)}\) of the theory page, section 4, are computed on the host before the run and sent once (section 3).</td></tr>
   <tr class="sep"><td>1. fit patches</td><td>\(w_j = F^I_j(v_j)\); add \(|d_k|^\kappa(2w_j - v_j)\) into an image sum per mode</td><td>\(K\) image sums</td><td>the average image of \(2\mathbf{w}-\mathbf{v}\)</td></tr>
   <tr><td>2. update patches</td><td>\(v_j \leftarrow v_j + 2\rho(z_j - w_j)\), \(z_j\) the patch of that image; add \(|d_k|^\kappa v_j\) into an image sum per mode</td><td>\(K\) image sums</td><td>\(\bar x\), the reported image</td></tr>
   <tr class="sep"><td>3. add a mode<br>(scheduled iterations)</td><td>the residual, back-transformed and divided by the patch of \(\bar x\); add into a sum</td><td>one probe-sized sum</td><td>the new mode and the rescale factor; each GPU then makes its own copies and rescales its own arrays</td></tr>
@@ -163,24 +164,22 @@ li { margin: 4px 0; }
   <tr><td>\(\varepsilon\) of the division by \(\Lambda_k\)</td><td>steps 0, 1, 2</td><td>each owner adds \(|\Lambda_k|^2\) over its band; the sums are added and divided by \(N\), so every pixel of the grid is counted once</td></tr>
   <tr><td>\(\varepsilon\) of the division by the patch</td><td>steps 3, 4</td><td>each GPU adds \(\|p_j\|^2\) over its positions, \(p_j\) the patch of \(\bar x\); the sums are added and divided by \(J N_p^2\); one number per iteration</td></tr>
   <tr><td>every mean over positions (\(d^{(0)}\), a new mode, \(u_k\), \(d_k\), the deviation)</td><td>steps 0, 3, 4, 5, 6</td><td>the GPUs' sums are added and divided by \(J\); never an average of the GPUs' own means</td></tr>
-  <tr><td>the median of \(x^{(0)}\)</td><td>step 0</td><td>over the whole grid, pixels no patch reaches included; taken on the host (section 3)</td></tr>
-</table>
+  </table>
 </div>
 
-<p><b>Why the result matches one GPU.</b> Each position is on exactly one GPU and each image row has exactly one owner, so every sum receives every contribution once. The owner adds the pieces in GPU order, so every copy of a value is identical on all GPUs. What differs from a one-GPU run is the order of the additions inside the sums. How far that moves the result is measured by the tests (one device against two and three, with a block boundary inside a scan line) and stated there as a tolerance. It is not assumed.</p>
+<p><b>Why the result matches one GPU.</b> Each position is on exactly one GPU and each image row has exactly one owner, so every sum receives every contribution once. The owner adds the pieces in GPU order, so every copy of a value is identical on all GPUs. What differs from a one-GPU run is the order of the additions inside the sums. How far that moves the result is measured, not assumed; the measurements are in section 5.</p>
 
 <h2>3. What crosses between host and GPU</h2>
 <div class="sgoal"><b>Goal</b>List every transfer between host memory and the GPUs, with when it happens.</div>
 <div class="frame">
 <table class="t">
   <tr><th>when</th><th>direction</th><th>what</th><th>gold balls</th></tr>
-  <tr><td>once, at the start</td><td>host to GPU</td><td>the frames of each GPU's block, as counts, converted to amplitudes on the GPU; the position list; a starting probe or object when one is given</td><td class="n">0.4 GB</td></tr>
-  <tr><td>once, in step 0</td><td>GPU to host and back</td><td>the bands of the starting image, for its median (numpy's definition); the median back</td><td class="n">3 MB</td></tr>
+  <tr><td>once, at the start</td><td>host to GPU</td><td>the amplitudes of each GPU's block; the position list; the starting probe, to every GPU; the starting object, each band to its owner</td><td class="n">0.8 GB</td></tr>
   <tr><td>each iteration</td><td>GPU to host</td><td>a few numbers for the progress line</td><td class="n">bytes</td></tr>
   <tr><td>once, at the end</td><td>GPU to host</td><td>the bands of \(\bar x\) and of the coverage, joined into one image; \(d_k\); any per-position output, put back in scan order</td><td class="n">about 10 MB</td></tr>
 </table>
 </div>
-<p>Nothing in the iteration waits on the host: no value is read back to decide what to do next.</p>
+<p>The starting probe and object, when not given, are computed on the host from the frames, with numpy, before anything goes to the GPUs. Nothing in the iteration waits on the host except the data error for the progress line.</p>
 
 <h2>4. What the user sets, and what is refused</h2>
 <div class="sgoal"><b>Goal</b>Say how the user chooses the GPUs, and name the cases <code>recon</code> refuses before it starts.</div>
@@ -200,6 +199,21 @@ li { margin: 4px 0; }
   <li>The batch size is not set here. It is chosen automatically; a model parameter overrides it.</li>
   <li>Refused, with the reason named: more devices than positions; more devices asked for than the node has; an odd \(N_p\) (the old code cannot run it, so there is nothing to match); a patch that reaches outside the object grid; a run that does not fit in the devices' free memory.</li>
 </ul>
+<h2>5. Measured agreement</h2>
+<div class="sgoal"><b>Goal</b>Say how closely the new code agrees with the old code, and with itself on different devices.</div>
+<p>Measured on 2026-10-03 with <code>dev_scripts/baseline/compare_baseline.py</code> and the test suite. Differences are relative, on the object image, after removing one complex scale.</p>
+<div class="frame">
+<table class="t">
+  <tr><th>case</th><th>new code against old code</th><th>new code, one device against several</th></tr>
+  <tr><td>tiny problem, no noise, known probe, 20 iterations</td><td class="n">\(6 \times 10^{-7}\)</td><td class="n">\(6 \times 10^{-7}\) (2, 3, 5 devices)</td></tr>
+  <tr><td>tiny problem, no noise, two modes estimated, 6 iterations</td><td class="n">within \(10^{-3}\) (test tolerance)</td><td class="n">within \(10^{-3}\) (3 devices)</td></tr>
+  <tr><td>gold balls, known probe, 100 iterations</td><td class="n">\(2 \times 10^{-5}\); data error equal to 6 digits</td><td></td></tr>
+  <tr><td>synthetic with noise, known probe, 100 iterations</td><td class="n">\(3 \times 10^{-3}\); data error equal to 6 digits; error to the truth 0.036925 against 0.036927</td><td class="n">\(1 \times 10^{-3}\) (3 devices); \(3 \times 10^{-3}\) (CPU against Apple GPU)</td></tr>
+  <tr><td>blind, one mode, 200 iterations</td><td class="n">data error equal to 7 digits for 3 iterations, then to about \(10^{-3}\); error to the truth 0.0494 against 0.0497</td><td></td></tr>
+</table>
+</div>
+<p>On noisy data the object image is sensitive to rounding: two runs that differ only in the order of additions drift apart by about \(10^{-3}\) over 100 iterations, while the data error and the error to the truth stay fixed to five digits. When the probe is estimated, the outlier test is a threshold, so a last-bit difference can change which probe copies are replaced. The new code differs from the old code by no more than it differs from itself on another device.</p>
+
 <p>Decided by Charlie on 2026-10-03, after a panel review (<a href="panel-computing.html">its report</a>). Two changes are planned for after the new code matches the old: updating \(v_j\) and \(s_{j,k}\) in place, which removes \(w_j\) and \(r_{j,k}\) and fits 1.9 times as many positions per GPU; and computing each distinct Fourier transform once.</p>
 </div>
 <script>
