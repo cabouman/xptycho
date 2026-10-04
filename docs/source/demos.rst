@@ -23,12 +23,12 @@ top, so you can change one and rerun to see its effect.
      - Reconstruction from the data alone: the probe is not given, so it is estimated,
        starting from one mode and adding a second at iteration 20.  The two-mode experiment
        of the 2025 paper.
-   * - ``demo_3_goldballs_known_probe.py``
-     - Measured data, from the raw file: the gold-ball scan of the Advanced Light Source.
-       :ref:`Preprocessing <PreprocessDocs>` one step at a time (dark subtraction, removal of
-       outlier frames, centering and cropping, a Tukey window), then reconstruction with a
-       known probe, shown beside the result of the reference code.  The measured-data
-       experiment of the 2023 PMACE paper.
+   * - ``demo_3_goldballs_blind_two_modes.py``
+     - Measured data, from the raw file alone: the gold-ball scan of the Advanced Light
+       Source.  :ref:`Preprocessing <PreprocessDocs>` one step at a time (dark subtraction,
+       removal of outlier frames, centering and cropping, a Tukey window), then
+       reconstruction with the probe estimated from the data, two modes, made orthogonal
+       when the second is added.  The measured-data experiment of the 2025 paper.
 
 What a demo writes
 ------------------
@@ -44,8 +44,8 @@ Each demo writes one folder, ``demo/output/<script name>``:
    * - ``scan.png``
      - One diffraction frame and the map of scan positions.
    * - ``object.png``
-     - The magnitude and phase of the reconstruction above those of the truth or the
-       reference, in the region the script chooses to view.
+     - The magnitude and phase of the reconstruction, above those of the truth when there
+       is one, in the region the script chooses to view.
    * - ``probe.png``
      - The probe modes, one per row, with the share of the energy in each.
    * - ``data_error.png``
@@ -84,9 +84,6 @@ address and the local folder, downloads the file on first run, and loads it:
      - The complex object and the two probe modes of the 2025 blind multi-mode paper.
    * - ``AuBalls_700ms_30nmStep_3_full.cxi`` (632 MB)
      - The raw gold-ball file, downloaded by demo 3 from the Coherent X-ray Imaging Data Bank.
-   * - ``demo_xptycho_goldballs_reference.h5`` (4 MB)
-     - The reference for the gold balls: the known probe, and the object the reference code
-       reconstructs with it.
 
 The gold-ball data is the *Ptychography Gold Ball Example Dataset* of Stefano Marchesini et
 al., collected at beamline 5.3.2.1 of the Advanced Light Source and published in the

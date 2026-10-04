@@ -28,6 +28,59 @@ The model
 .. autoclass:: xptycho.PtychoModel
    :members:
 
+Reconstruction parameters
+-------------------------
+
+Set with :meth:`~xptycho.PtychoModel.set_params`, read with
+:meth:`~xptycho.PtychoModel.get_params`, and listed with their values, units, and origins by
+:meth:`~xptycho.PtychoModel.print_params`.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 14 56
+
+   * - name
+     - default
+     - meaning
+   * - ``object_data_fit``
+     - 0.6
+     - How far each object patch moves toward the patch that fits its frame, between 0 and 1
+       (:math:`\alpha_1` in the papers).
+   * - ``probe_data_fit``
+     - 0.6
+     - The same for each probe copy (:math:`\alpha_2`).
+   * - ``probe_weight_exponent``
+     - 1.25
+     - The power of the probe magnitude that weights a patch when the patches are averaged
+       into the object (:math:`\kappa`), between 1 and 2.
+   * - ``relaxation``
+     - 0.5
+     - The step size of the iteration (:math:`\rho`), between 0 and 1.
+   * - ``mode_schedule``
+     - none
+     - The iterations at which a probe mode is added, until the probe has ``probe_modes``
+       modes.
+   * - ``mode_energy_fraction``
+     - 0.05
+     - The share of the probe energy a new mode starts with.
+   * - ``orthogonalize_modes``
+     - off
+     - Replace the modes by an orthogonal set each time a mode is added.
+   * - ``initial_probe_distance``
+     - none
+     - Meters.  The Fresnel propagation distance used in computing the starting probe and a
+       new mode.  None means no propagation.
+   * - ``object_shape``
+     - from the positions
+     - The rows and columns of the object grid.  By default the smallest grid that holds
+       every patch.
+   * - ``object_origin``
+     - from the positions
+     - Meters.  The position of the center of the first pixel of the object grid.
+   * - ``batch_size``
+     - from the memory
+     - The positions processed together on a device.
+
 The scan
 --------
 
