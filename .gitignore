@@ -1,6 +1,17 @@
 # Additional things to ignore in this package
-demo/output/*
-demo/input/
+# Demo data and demo results, wherever a demo is run from.
+demo/**/input/
+demo/**/output/
+# Data and result files are never committed; they are downloaded or regenerated.
+*.h5
+*.hdf5
+*.npy
+*.npz
+*.tgz
+*.tar.gz
+*.tif
+*.tiff
+*.cxi
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
