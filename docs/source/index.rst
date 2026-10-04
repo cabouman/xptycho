@@ -33,9 +33,10 @@ A reconstruction in one screen
 
    import xptycho
 
-   scan = xptycho.Scan.open('scan.h5')          # frames, positions, geometry
-   model = xptycho.FarFieldModel.from_scan(scan, estimate_probe=True, probe_modes=2)
-   recon = model.recon(scan, method='pmace', iterations=200)
+   scan = xptycho.Scan.load('scan.h5')          # frames, positions, instrument facts
+   model = xptycho.PtychoModel.from_scan(scan, probe_modes=2)
+   model.set_params(mode_schedule=[20], initial_probe_distance=2e-6)
+   recon = model.recon(scan, iterations=200)    # no probe given, so it is estimated
    recon.show()
    image = recon.object                         # complex, with recon.pixel_size
 
@@ -47,9 +48,8 @@ What xptycho gives you
 - **The probe modes** with their energy fractions.
 - **A parameter table with provenance**: which values were given,
   read from the file, derived, defaulted, or estimated.
-- **Scale**: frames are read in batches, so a scan larger than memory
-  reconstructs on one GPU, and the positions can be split across the
-  GPUs of one node.
+- **Scale**: a reconstruction runs on one GPU or divided among the
+  GPUs of one node, with the same result.
 
 .. toctree::
    :hidden:

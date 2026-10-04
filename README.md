@@ -9,9 +9,8 @@ from a ptychographic scan: far-field diffraction patterns recorded
 while a focused X-ray probe steps across the object in overlapping
 positions.  The method is projected multi-agent consensus equilibrium
 (PMACE).  The object and, when asked, the probe are estimated
-together, with one or more probe modes.  Scans are processed in
-batches, so the data need not fit in memory, and the arithmetic runs
-on CPUs or GPUs through PyTorch.
+together, with one or more probe modes.  The arithmetic runs through
+PyTorch on a CPU, on one GPU, or divided among the GPUs of one node.
 
 The output is the complex object image, magnitude and phase both
 retained, with its pixel size and origin, in a form that feeds a 3-D

@@ -159,14 +159,17 @@ class PtychoModel:
 
     # ------------------------------------------------------- the object grid
     def _grid(self):
-        """The object grid as ``(shape, origin)``: the given values, or the
-        smallest grid that holds every patch."""
-        centers = np.round(self.positions / self.pixel_size).astype(np.int64)
-        first = centers - self.frame_size // 2
-        origin = self._recon['object_origin']
+        """The object grid as ``(shape, origin)``.  With neither given, the
+        smallest grid that holds every patch.  With only the shape given,
+        a grid of that shape centered on position zero.  The origin is the
+        position, in meters, of the center of the grid's first pixel."""
+        shape, origin = self._recon['object_shape'], self._recon['object_origin']
+        if origin is None and shape is not None:
+            # A given shape with no origin: the grid is centered on position zero.
+            origin = tuple(-(n // 2) * self.pixel_size for n in shape)
         if origin is None:
+            first = np.round(self.positions / self.pixel_size).astype(np.int64) - self.frame_size // 2
             origin = tuple(float(v) for v in first.min(axis=0) * self.pixel_size)
-        shape = self._recon['object_shape']
         if shape is None:
             starts = self._starts(origin)
             shape = tuple(int(v) for v in starts.max(axis=0) + self.frame_size)
@@ -308,6 +311,53 @@ class PtychoModel:
             raise ValueError('the scan has {} frames of size {} but the model has {} positions and frame size {}'.format(
                 scan.num_frames, scan.frame_size, len(self.positions), self.frame_size))
         return scan.amplitudes()
+
+    def refine_positions(self, scan, x, d, max_shift=1):
+        """Find, for each position, the whole-pixel shift at which the
+        forward model best matches the data.  Changes nothing: accept the
+        result with ``set_params(positions=...)``.
+
+        Every shift of up to ``max_shift`` pixels along each axis is tried,
+        with the object ``x`` and the probe ``d`` held fixed.  A shift that
+        would take the patch outside the object grid is not tried.
+
+        Args:
+            scan (Scan): the measurement.
+            x, d: the current object and probe, as in :meth:`forward`.
+            max_shift (int, optional): pixels.  Defaults to 1.
+
+        Returns:
+            tuple: ``(positions, misfit)``.  ``positions`` is ``(J, 2)`` in
+            meters.  ``misfit`` is ``(J,)``: the fraction by which the best
+            shift lowers the difference from the data, 0 where the current
+            position is already the best.
+        """
+        layout, starts = self._layout()
+        y = torch.as_tensor(self._amplitudes(scan))
+        device = layout.devices[0]
+        image = torch.as_tensor(np.asarray(x, dtype=np.complex64), device=device)
+        modes = torch.as_tensor(self._check_probe(d), device=device)
+        starts = torch.as_tensor(starts, dtype=torch.int64, device=device)
+        limit = torch.tensor(layout.object_shape, device=device) - self.frame_size
+        shifts = [(r, c) for r in range(-max_shift, max_shift + 1) for c in range(-max_shift, max_shift + 1)]
+        errors = torch.full((len(shifts), len(starts)), float('inf'), device=device)
+        step = self._batch_size(device)
+        for first in range(0, len(starts), step):
+            batch = slice(first, first + step)
+            measured = y[batch].to(device)
+            for i, shift in enumerate(shifts):
+                moved = starts[batch] + torch.tensor(shift, device=device)
+                inside = ((moved >= 0) & (moved <= limit)).all(dim=1)
+                patches = op.gather_patches(image, torch.where(inside[:, None], moved, starts[batch]), self.frame_size)
+                predicted = torch.sqrt((op.fft2c(modes[:, None] * patches).abs() ** 2).sum(dim=0))
+                error = torch.linalg.vector_norm(predicted - measured, dim=(-2, -1))
+                errors[i, batch] = torch.where(inside, error, torch.full_like(error, float('inf')))
+        best = errors.argmin(dim=0)
+        current = errors[shifts.index((0, 0))]
+        gain = current - errors.min(dim=0).values
+        misfit = torch.where(current > 0, gain / current, torch.zeros_like(gain)).cpu().numpy()
+        shift = torch.tensor(shifts, device=device)[best].cpu().numpy()
+        return self.positions + shift * self.pixel_size, misfit
 
     # ------------------------------------------------------------ the start
     def initial_probe(self, scan):

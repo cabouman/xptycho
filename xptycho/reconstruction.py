@@ -79,6 +79,18 @@ class Reconstruction:
         """The magnitude of the object, float32."""
         return np.abs(self.object).astype(np.float32)
 
+    def scanned_region(self):
+        """A boolean mask of the object grid, True inside the rectangle
+        spanned by the centers of the scan positions.  This is the region
+        every probe position surrounds, where the object is best
+        determined; comparisons with a truth are made inside it."""
+        centers = (self.positions - np.asarray(self.origin)) / self.pixel_size
+        first = np.floor(centers.min(axis=0)).astype(int)
+        last = np.ceil(centers.max(axis=0)).astype(int)
+        mask = np.zeros(self.object.shape, dtype=bool)
+        mask[first[0]:last[0] + 1, first[1]:last[1] + 1] = True
+        return mask
+
     def summary(self):
         """Return the parameter table as text, then the outcome of the run."""
         width = max(len(row['name']) for row in self.params)
@@ -98,9 +110,9 @@ class Reconstruction:
         Args:
             directory (str, optional): where the figures are saved.  None
                 shows them without saving.
-            compare_to (optional): a truth with ``object`` and ``probe``
-                attributes.  Adds the truth and prints the NRMSE of the
-                object over the covered pixels.
+            compare_to (Truth, optional): a known object.  Adds the truth to
+                the figure and prints the NRMSE of the object inside
+                :meth:`scanned_region`.
         """
         from .view import show_reconstruction
         show_reconstruction(self, directory, compare_to)

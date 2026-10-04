@@ -10,10 +10,12 @@ holds the parameters and the forward model, and
 
 __version__ = '0.0.1'
 
-from .scan import Scan
+from .scan import Scan, energy_to_wavelength
 from .model import PtychoModel
 from .reconstruction import Reconstruction
 from .metrics import nrmse, match_scale
+from .datasets import Truth, demo_truth, scan_positions
 from . import operators
 
-__all__ = ['Scan', 'PtychoModel', 'Reconstruction', 'nrmse', 'match_scale', 'operators']
+__all__ = ['Scan', 'PtychoModel', 'Reconstruction', 'Truth', 'demo_truth', 'scan_positions', 'nrmse',
+           'match_scale', 'energy_to_wavelength', 'operators']

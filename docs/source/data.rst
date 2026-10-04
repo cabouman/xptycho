@@ -42,9 +42,7 @@ doi:10.11577/1454414.
 Scan files
 ----------
 
-xptycho stores a scan in one HDF5 file holding the raw counts, the
-dark frame, the mask, the positions in metres, the geometry, and the
-provenance of each value.  :func:`xptycho.Scan.open` reads that file
-and also reads CXI files.  A folder of per-frame TIFFs with a
-translation table, the layout of the original ptycho_pmace code, is
-read by :func:`xptycho.Scan.from_tiff_folder`.
+xptycho stores a scan in one HDF5 file holding the frames, the
+positions in meters, the wavelength, the detector distance, and the
+detector pixel.  :meth:`xptycho.Scan.save` writes that file and
+:meth:`xptycho.Scan.load` reads it.

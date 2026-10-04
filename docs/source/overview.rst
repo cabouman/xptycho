@@ -43,12 +43,10 @@ parameter table that records where every value came from.
 Scale
 -----
 
-Frames are read in batches and the consensus sums are accumulated
-across batches, so a scan larger than memory reconstructs on one
-GPU.  The per-position state of the iteration is placed on the device
-if it fits there, else in host memory if it fits there, else in a
-file.  The choice is printed.  On a node with several GPUs the
-positions are split across them.
+All the data of a reconstruction is held in GPU memory.  On a node
+with several GPUs the scan positions and the object image are divided
+among them, so the largest scan that fits grows with the number of
+GPUs.  The result is the same, up to rounding, for any number of GPUs.
 
 See :ref:`QuickStart` for a complete script and :ref:`Theory` for the
 equations.

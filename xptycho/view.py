@@ -23,22 +23,30 @@ def show_reconstruction(recon, directory=None, compare_to=None):
     truth = None
     if compare_to is not None:
         truth = np.asarray(compare_to.object)
-        obj = match_scale(obj, truth, recon.coverage)
-        print('object NRMSE over the covered pixels: {:.6f}'.format(nrmse(recon.object, truth, recon.coverage)))
+        region = recon.scanned_region()
+        obj = match_scale(obj, truth, region)
+        covered = region
+        print('object NRMSE inside the scanned region: {:.6f}'.format(nrmse(recon.object, truth, region)))
+
+    # Show only the rows and columns that hold something.
+    keep_rows, keep_cols = np.flatnonzero(covered.any(axis=1)), np.flatnonzero(covered.any(axis=0))
+    window = (slice(keep_rows[0], keep_rows[-1] + 1), slice(keep_cols[0], keep_cols[-1] + 1))
+    covered, obj = covered[window], obj[window]
+    if truth is not None:
+        truth = truth[window]
 
     rows = 2 if truth is not None else 1
     fig, axes = plt.subplots(rows, 2, figsize=(11, 5 * rows), squeeze=False)
     mag = np.where(covered, np.abs(obj), np.nan)
     phase = np.where(covered, np.angle(obj), np.nan)
-    limits = {}
+    # One gray scale per quantity, shared by the reconstruction and the truth.
+    mag_limits = tuple(np.nanpercentile(mag, [1, 99]))
+    phase_limits = tuple(np.nanpercentile(phase, [1, 99]))
+    _image(axes[0, 0], fig, mag, 'object, magnitude', 'gray', *mag_limits)
+    _image(axes[0, 1], fig, phase, 'object, phase (rad)', 'gray', *phase_limits)
     if truth is not None:
-        t_mag = np.where(covered, np.abs(truth), np.nan)
-        t_phase = np.where(covered, np.angle(truth), np.nan)
-        limits = dict(mag=(np.nanmin(t_mag), np.nanmax(t_mag)), phase=(np.nanmin(t_phase), np.nanmax(t_phase)))
-        _image(axes[1, 0], fig, t_mag, 'truth, magnitude', 'gray', *limits['mag'])
-        _image(axes[1, 1], fig, t_phase, 'truth, phase (rad)', 'twilight', *limits['phase'])
-    _image(axes[0, 0], fig, mag, 'object, magnitude', 'gray', *limits.get('mag', (None, None)))
-    _image(axes[0, 1], fig, phase, 'object, phase (rad)', 'twilight', *limits.get('phase', (None, None)))
+        _image(axes[1, 0], fig, np.where(covered, np.abs(truth), np.nan), 'truth, magnitude', 'gray', *mag_limits)
+        _image(axes[1, 1], fig, np.where(covered, np.angle(truth), np.nan), 'truth, phase (rad)', 'gray', *phase_limits)
     fig.tight_layout()
 
     modes = len(recon.probe)
