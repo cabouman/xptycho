@@ -89,8 +89,8 @@ li { margin: 4px 0; }
 <table class="t">
   <tr><th>array</th><th>what it is</th><th>bytes</th><th>placement</th></tr>
   <tr><td>\(y_j\)</td><td>measured amplitudes (float32)</td><td>\(4 N_p^2\) per position</td><td rowspan="3"><b>sharded by position.</b> Each GPU holds one <b>block</b> of positions. These arrays never move.</td></tr>
-  <tr><td>\(v_j\), \(w_j\)</td><td>the position's copy of its object patch, and its data-fit result</td><td>\(16 N_p^2\) per position</td></tr>
-  <tr><td>\(s_{j,k}\), \(r_{j,k}\)</td><td>the position's copy of each probe mode, and its data-fit result; only when the probe is estimated</td><td>\(16 K N_p^2\) per position</td></tr>
+  <tr><td>\(v_j\)</td><td>the position's copy of its object patch</td><td>\(8 N_p^2\) per position</td></tr>
+  <tr><td>\(s_{j,k}\)</td><td>the position's copy of each probe mode; only when the probe is estimated</td><td>\(8 K N_p^2\) per position</td></tr>
   <tr class="sep"><td>\(\bar x\), the image sums, \(\Lambda_k\)</td><td>the object image, the sums over positions that build it, the coverage maps</td><td>a few times \(8N\) in total</td><td><b>sharded by image row.</b> Each GPU owns one <b>band</b> of rows, and also holds its <b>window</b>.</td></tr>
   <tr class="sep"><td>\(d_k\), \(u_k\), the deviation, the position list</td><td>the probe modes and the other probe-sized arrays; the scan positions</td><td>small</td><td><b>broadcast.</b></td></tr>
 </table>
@@ -127,12 +127,12 @@ li { margin: 4px 0; }
 <div class="frame">
 <table class="t" style="width:auto">
   <tr><th>case</th><th>bytes per position</th><th>positions per GPU, \(N_p = 256\)</th><th>positions per GPU, \(N_p = 512\)</th></tr>
-  <tr><td>known probe</td><td>\(20 N_p^2\)</td><td class="n">53,000</td><td class="n">13,000</td></tr>
-  <tr><td>estimated probe, 1 mode</td><td>\(36 N_p^2\)</td><td class="n">29,000</td><td class="n">7,400</td></tr>
-  <tr><td>estimated probe, 2 modes</td><td>\(52 N_p^2\)</td><td class="n">20,000</td><td class="n">5,100</td></tr>
+  <tr><td>known probe</td><td>\(12 N_p^2\)</td><td class="n">89,000</td><td class="n">22,000</td></tr>
+  <tr><td>estimated probe, 1 mode</td><td>\(20 N_p^2\)</td><td class="n">53,000</td><td class="n">13,000</td></tr>
+  <tr><td>estimated probe, 2 modes</td><td>\(28 N_p^2\)</td><td class="n">38,000</td><td class="n">9,500</td></tr>
 </table>
 </div>
-<p>With \(N_g\) GPUs the capacity is \(N_g\) times these. The gold balls (794 positions, \(N_p = 512\), 2 modes) need 11 GB and fit on one GPU. Before anything is allocated, the memory each GPU needs, for the final number of modes, is compared with what that GPU has free; a run that does not fit is refused with the shortfall named.</p>
+<p>With \(N_g\) GPUs the capacity is \(N_g\) times these. The gold balls (794 positions, \(N_p = 512\), 2 modes) need 6 GB and fit on one GPU. Before anything is allocated, the memory each GPU needs, for the final number of modes, is compared with what that GPU has free; a run that does not fit is refused with the shortfall named.</p>
 
 <h2>2. One iteration on \(N_g\) GPUs</h2>
 <div class="sgoal"><b>Goal</b>Say what each GPU computes over its own positions and what moves between GPUs in each step; then say why the result matches one GPU.</div>
@@ -146,16 +146,16 @@ li { margin: 4px 0; }
 <table class="t">
   <tr><th>step</th><th>each GPU, over its own positions</th><th>summed to owner</th><th>the owner computes, and windows copy</th></tr>
   <tr><td>0. start<br>(once)</td><td>\(v_j = P_j x^{(0)}\), cut from its window; \(s_{j,k} = d^{(0)}_k\); add \(|d_k|^\kappa\) at each position into an image sum per mode</td><td>\(K\) image sums</td><td>\(\Lambda_k\). The starting probe \(d^{(0)}\) and object \(x^{(0)}\) of the theory page, section 4, are computed on the host before the run and sent once (section 3).</td></tr>
-  <tr class="sep"><td>1. fit patches</td><td>\(w_j = F^I_j(v_j)\); add \(|d_k|^\kappa(2w_j - v_j)\) into an image sum per mode</td><td>\(K\) image sums</td><td>the average image of \(2\mathbf{w}-\mathbf{v}\)</td></tr>
-  <tr><td>2. update patches</td><td>\(v_j \leftarrow v_j + 2\rho(z_j - w_j)\), \(z_j\) the patch of that image; add \(|d_k|^\kappa v_j\) into an image sum per mode</td><td>\(K\) image sums</td><td>\(\bar x\), the reported image</td></tr>
+  <tr class="sep"><td>1. fit patches</td><td>\(w_j = F^I_j(v_j)\); add \(|d_k|^\kappa(2w_j - v_j)\) into an image sum per mode; \(v_j \leftarrow v_j - 2\rho w_j\)</td><td>\(K\) image sums</td><td>the average image of \(2\mathbf{w}-\mathbf{v}\)</td></tr>
+  <tr><td>2. update patches</td><td>\(v_j \leftarrow v_j + 2\rho z_j\), \(z_j\) the patch of that image; add \(|d_k|^\kappa v_j\) into an image sum per mode</td><td>\(K\) image sums</td><td>\(\bar x\), the reported image</td></tr>
   <tr class="sep"><td>3. add a mode<br>(scheduled iterations)</td><td>the residual, back-transformed and divided by the patch of \(\bar x\); add into a sum</td><td>one probe-sized sum</td><td>the new mode and the rescale factor; each GPU then makes its own copies and rescales its own arrays</td></tr>
-  <tr><td>4. fit probe copies</td><td>\(r_{j,k} = F^P_{j,k}(s_{j,k})\), all modes, using the modes as they stand before this step; add \(2r_{j,k} - s_{j,k}\) into a sum per mode</td><td>\(K\) probe-sized sums</td><td>\(u_k\)</td></tr>
-  <tr><td>5. update probe copies</td><td>\(s_{j,k} \leftarrow s_{j,k} + 2\rho(u_k - r_{j,k})\); add \(s_{j,k}\) into a sum per mode. After the new modes return, add \(|d_k|^\kappa\) at each position into an image sum per mode</td><td>\(K\) probe-sized sums; then \(K\) image sums</td><td>the new modes \(d_k\); then the new \(\Lambda_k\)</td></tr>
+  <tr><td>4. fit probe copies</td><td>\(r_{j,k} = F^P_{j,k}(s_{j,k})\), all modes, using the modes as they stand before this step; add \(2r_{j,k} - s_{j,k}\) into a sum per mode; \(s_{j,k} \leftarrow s_{j,k} - 2\rho r_{j,k}\)</td><td>\(K\) probe-sized sums</td><td>\(u_k\)</td></tr>
+  <tr><td>5. update probe copies</td><td>\(s_{j,k} \leftarrow s_{j,k} + 2\rho u_k\); add \(s_{j,k}\) into a sum per mode. After the new modes return, add \(|d_k|^\kappa\) at each position into an image sum per mode</td><td>\(K\) probe-sized sums; then \(K\) image sums</td><td>the new modes \(d_k\); then the new \(\Lambda_k\)</td></tr>
   <tr><td>6. replace outliers</td><td>add \(|s_{j,k} - d_k|\) into a sum per mode; after the result returns, set outlying pixels of \(s_{j,k}\) to \(d_k\)</td><td>\(K\) probe-sized sums</td><td>the deviation per pixel</td></tr>
   <tr class="sep"><td>7. data error<br>(for the progress line)</td><td>forward-project the patches of \(\bar x\) with \(d_k\); add the squared difference from \(y_j\), and \(y_j^2\)</td><td>two numbers</td><td>the data error</td></tr>
 </table>
 </div>
-<p>Steps 3 to 6 run only when the probe is estimated. With a known probe, \(\Lambda_k\) is computed once in step 0. Within a GPU, a step processes its block in batches (about 1,000 positions at \(N_p = 256\) with 9 GB free) so that the temporary arrays of the Fourier transforms fit.</p>
+<p>The theory page's update \(v + 2\rho(z - w)\) is done in place in two parts, \(-2\rho w\) in step 1 and \(+2\rho z\) in step 2, so \(w\) is never stored; likewise for the probe copies. Steps 3 to 6 run only when the probe is estimated. With a known probe, \(\Lambda_k\) is computed once in step 0. Within a GPU, a step processes its block in batches (about 1,000 positions at \(N_p = 256\) with 9 GB free) so that the temporary arrays of the Fourier transforms fit.</p>
 
 <p><b>Numbers that depend on all the positions or on the whole image.</b> Each is formed from sums over all the GPUs. Computing one per GPU or per batch gives a different result (an error near \(10^{-3}\) in a small test).</p>
 <div class="frame">
@@ -214,7 +214,7 @@ li { margin: 4px 0; }
 </div>
 <p>On noisy data the object image is sensitive to rounding: two runs that differ only in the order of additions drift apart by about \(10^{-3}\) over 100 iterations, while the data error and the error to the truth stay fixed to five digits. When the probe is estimated, the outlier test is a threshold, so a last-bit difference can change which probe copies are replaced. The new code differs from the old code by no more than it differs from itself on another device.</p>
 
-<p>Decided by Charlie on 2026-10-03, after a panel review (<a href="panel-computing.html">its report</a>). Two changes are planned for after the new code matches the old: updating \(v_j\) and \(s_{j,k}\) in place, which removes \(w_j\) and \(r_{j,k}\) and fits 1.9 times as many positions per GPU; and computing each distinct Fourier transform once.</p>
+<p>Decided by Charlie on 2026-10-03, after a panel review (<a href="panel-computing.html">its report</a>).</p>
 </div>
 <script>
 window.MathJax = { tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] }, svg: { fontCache: 'global' } };

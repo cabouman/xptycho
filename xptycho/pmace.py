@@ -54,7 +54,7 @@ class Run:
         self.num_pixels = layout.object_shape[0] * layout.object_shape[1]
         self.modes = torch.as_tensor(np.asarray(probe, dtype=np.complex64)).to(layout.devices[0])
 
-        self.starts, self.y, self.v, self.w, self.s = [], [], [], [], []
+        self.starts, self.y, self.v, self.s = [], [], [], []
         init_windows = layout.copy_to_window(layout.split(np.asarray(init_object, dtype=np.complex64)))
         for g, device in enumerate(layout.devices):
             block, window = layout.blocks[g], layout.windows[g]
@@ -63,7 +63,6 @@ class Run:
             self.starts.append(torch.as_tensor(local, dtype=torch.int64, device=device))
             self.y.append(torch.as_tensor(amplitudes[block], dtype=torch.float32, device=device))
             self.v.append(op.gather_patches(init_windows[g], self.starts[g], self.size))
-            self.w.append(torch.empty_like(self.v[g]))
             if estimate_probe:
                 copies = self.modes.to(device)[:, None].repeat(1, len(block), 1, 1)
                 self.s.append(copies)
@@ -129,7 +128,11 @@ class Run:
     # ------------------------------------------------------ the object pass
     def update_object(self):
         """Steps 1 and 2: fit every patch to its data, average, update
-        every patch, and average again.  Sets the reported image."""
+        every patch, and average again.  Sets the reported image.
+
+        The update ``v + 2 rho (z - w)`` is done in place in two parts:
+        ``2 rho w`` is subtracted when ``w`` is computed, and ``2 rho z``
+        is added once the average is known, so ``w`` is never stored."""
         alpha, rho = self.params['object_data_fit'], self.params['relaxation']
 
         parts = self._new_parts()
@@ -143,15 +146,15 @@ class Run:
                 fitted = op.ifft2c(torch.polar(scale * fields.abs(), fields.angle()))
                 fitted = op.stable_divide(fitted, d[:, None], eps[:, None])
                 w = (1 - alpha) * v + alpha * (weight[:, None, None, None] * fitted).sum(dim=0)
-                self.w[g][batch] = w
                 self._add_weighted(parts[g], g, 2 * w - v, batch)
+                self.v[g][batch] = v - 2 * rho * w
         consensus = self.layout.copy_to_window(self._average(parts))
 
         parts = self._new_parts()
         for g in range(len(self.layout)):
             for batch in self._batches(g):
                 z = op.gather_patches(consensus[g], self.starts[g][batch], self.size)
-                v = self.v[g][batch] + 2 * rho * (z - self.w[g][batch])
+                v = self.v[g][batch] + 2 * rho * z
                 self.v[g][batch] = v
                 self._add_weighted(parts[g], g, v, batch)
         self.image = self._average(parts)
@@ -175,15 +178,15 @@ class Run:
     # ------------------------------------------------------- the probe pass
     def update_probe(self):
         """Steps 4 to 6: fit every probe copy to its data, average, update
-        every copy, take the new modes, and replace outlying copies."""
+        every copy, take the new modes, and replace outlying copies.  The
+        update is done in place in two parts, as in :meth:`update_object`."""
         alpha, rho = self.params['probe_data_fit'], self.params['relaxation']
         num_modes, J = len(self.modes), self.num_positions
         patch_eps = self._patch_eps()
 
-        fitted_all, sums = [], []
+        sums = []
         for g in range(len(self.layout)):
             d = self.d[g]
-            r = torch.empty_like(self.s[g])
             total = torch.zeros_like(d)
             for batch in self._batches(g):
                 p, y, s = self._image_patches(g, batch), self.y[g][batch], self.s[g][:, batch]
@@ -192,17 +195,16 @@ class Run:
                 amplitude = torch.sqrt(y ** 2 / (intensity + 1e-6)) * fields.abs()
                 phase = op.fft2c(s * p).angle()
                 fitted = op.stable_divide(op.ifft2c(torch.polar(amplitude, phase)), p, patch_eps[g])
-                r[:, batch] = (1 - alpha) * s + alpha * fitted
-                total += (2 * r[:, batch] - s).sum(dim=1)
-            fitted_all.append(r)
+                r = (1 - alpha) * s + alpha * fitted
+                total += (2 * r - s).sum(dim=1)
+                self.s[g][:, batch] = s - 2 * rho * r
             sums.append(total)
         consensus = self.layout.broadcast(self.layout.sum_small(sums) / J)
 
         sums = []
         for g in range(len(self.layout)):
-            self.s[g] += 2 * rho * (consensus[g][:, None] - fitted_all[g])
+            self.s[g] += 2 * rho * consensus[g][:, None]
             sums.append(self.s[g].sum(dim=1))
-        del fitted_all
         modes = self.layout.sum_small(sums) / J
         d = self.layout.broadcast(modes)
 
