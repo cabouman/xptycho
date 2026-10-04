@@ -35,6 +35,8 @@ def load(name):
 
 def main():
     params = json.load(open(os.path.join(BASELINE, 'params.json')))
+    if isinstance(params.get('add_mode'), str):        # the captures store lists as text
+        params['add_mode'] = json.loads(params['add_mode'])
     y, bounds, init_obj = load('y_meas'), load('patch_bounds'), load('init_obj')
     ref_obj, window = load('ref_obj'), load('recon_win')
     blind = bool(params.get('joint_recon'))
@@ -53,11 +55,13 @@ def main():
     model = xptycho.PtychoModel(wavelength=wavelength, detector_distance=DISTANCE, detector_pixel=detector_pixel,
                                 frame_size=n, positions=positions,
                                 probe_modes=params.get('num_modes_final', 1 if probe.ndim == 2 else len(probe)))
+    print('pixel size {:.3g} m, wavelength {:.3g} m'.format(model.pixel_size, model.wavelength))
     model.set_params(object_shape=init_obj.shape, object_origin=(0.0, 0.0),
                      object_data_fit=params['obj_data_fit_prm'], relaxation=params['rho'],
                      probe_weight_exponent=params['probe_exp'])
     if blind:
         model.set_params(probe_data_fit=params['probe_data_fit_prm'], mode_schedule=params.get('add_mode', []),
+                         mode_energy_fraction=params.get('energy_ratio', 0.05),
                          initial_probe_distance=params.get('propagation_dist'))
     if DEVICES:
         model.configure_devices(devices=DEVICES)
