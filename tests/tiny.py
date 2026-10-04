@@ -39,3 +39,16 @@ def make_model(devices=('cpu',), **recon_params):
     model.set_params(object_shape=(OBJECT_SIZE, OBJECT_SIZE), object_origin=(0.0, 0.0), **recon_params)
     model.configure_devices(devices=list(devices))
     return model
+
+
+def make_second_mode(m=PROBE_SIZE, scale=0.4):
+    """A second probe mode of a different shape, as in
+    dev_scripts/baseline/capture_tiny_blind.py."""
+    y, x = np.mgrid[0:m, 0:m] - (m - 1) / 2
+    return (scale * make_probe(m) * (x / (0.32 * m)) * np.exp(1j * 0.3 * y)).astype(np.complex64)
+
+
+def numbers(array):
+    """Four numbers that pin a complex array."""
+    return dict(frobenius=np.linalg.norm(array), sum_real=array.real.sum(), sum_imag=array.imag.sum(),
+                max_abs=np.abs(array).max())

@@ -45,22 +45,30 @@ PMACE_DIR = os.path.expanduser('~/Documents/GitHub/ptycho_pmace')
 def main():
     pm, pu, pn = import_pmace()
     np.random.seed(0)
-    ref_obj = pu.load_img(os.path.join(DATA_DIR, 'ground_truth_img/ref_object.tiff'))
-    ref_modes = [pu.load_img(os.path.join(DATA_DIR, f'ground_truth_img/ref_probe_mode_{k}.tiff'))
-                 for k in (0, 1)]
-    y_meas = pu.load_measurement(os.path.join(DATA_DIR, 'frame_data/'))
-    table = pd.read_csv(os.path.join(DATA_DIR, 'Translations.tsv.txt'), sep=None,
-                        engine='python', header=0)
-    scan_loc = table[['FCx', 'FCy']].to_numpy()
-    patch_bounds = pu.get_proj_coords_from_data(scan_loc, y_meas)
-    recon_win = np.zeros(ref_obj.shape)
-    xmin, xmax, ymin, ymax = WINDOW
-    recon_win[xmin:xmax, ymin:ymax] = 1
-    ones = np.ones_like(ref_obj, dtype=np.complex64)
-    init_probe = pu.gen_init_probe(y_meas, patch_bounds, ones, fres_propagation=True,
-                                   sampling_interval=SAMPLING_INTERVAL, source_wl=WAVELENGTH,
-                                   propagation_dist=PROPAGATION_DIST)
-    init_obj = pu.gen_init_obj(y_meas, patch_bounds, ones.shape, ref_probe=init_probe)
+    stored = os.path.join(OUTPUT_ROOT, 'B4a_blind_single_mode', 'inputs')
+    if not os.path.isdir(DATA_DIR) and os.path.isdir(stored):
+        # The dataset is not on disk: use the inputs the single-mode capture stored.
+        load = lambda name: np.load(os.path.join(stored, name + '.npy'))
+        ref_obj, ref_modes = load('ref_obj'), [load('ref_probe_mode_0'), load('ref_probe_mode_1')]
+        y_meas, scan_loc, patch_bounds = load('y_meas'), load('scan_loc'), load('patch_bounds')
+        recon_win, init_probe, init_obj = load('recon_win'), load('init_probe'), load('init_obj')
+    else:
+        ref_obj = pu.load_img(os.path.join(DATA_DIR, 'ground_truth_img/ref_object.tiff'))
+        ref_modes = [pu.load_img(os.path.join(DATA_DIR, f'ground_truth_img/ref_probe_mode_{k}.tiff'))
+                     for k in (0, 1)]
+        y_meas = pu.load_measurement(os.path.join(DATA_DIR, 'frame_data/'))
+        table = pd.read_csv(os.path.join(DATA_DIR, 'Translations.tsv.txt'), sep=None,
+                            engine='python', header=0)
+        scan_loc = table[['FCx', 'FCy']].to_numpy()
+        patch_bounds = pu.get_proj_coords_from_data(scan_loc, y_meas)
+        recon_win = np.zeros(ref_obj.shape)
+        xmin, xmax, ymin, ymax = WINDOW
+        recon_win[xmin:xmax, ymin:ymax] = 1
+        ones = np.ones_like(ref_obj, dtype=np.complex64)
+        init_probe = pu.gen_init_probe(y_meas, patch_bounds, ones, fres_propagation=True,
+                                       sampling_interval=SAMPLING_INTERVAL, source_wl=WAVELENGTH,
+                                       propagation_dist=PROPAGATION_DIST)
+        init_obj = pu.gen_init_obj(y_meas, patch_bounds, ones.shape, ref_probe=init_probe)
     print(f'{len(y_meas)} frames of {y_meas.shape[1]}x{y_meas.shape[2]}, object {ref_obj.shape}')
 
     names = sys.argv[3].split(',') if len(sys.argv) > 3 else list(RUNS)   # optional: which runs
@@ -74,7 +82,8 @@ def main():
         save_dir = os.path.join(run_dir, 'old_code_output', 'full') + '/'
         os.makedirs(save_dir, exist_ok=True)
         with Timer() as timer:
-            result = pm.pmace_recon(y_meas, patch_bounds, init_obj, init_probe=init_probe,
+            # The old code updates the starting probe array in place, so each run gets a copy.
+            result = pm.pmace_recon(y_meas, patch_bounds, init_obj, init_probe=init_probe.copy(),
                                     ref_obj=ref_obj, ref_probe=ref_modes, num_iter=ITERATIONS,
                                     joint_recon=True, recon_win=recon_win, save_dir=save_dir,
                                     rho=RHO, add_reg=False, **args)

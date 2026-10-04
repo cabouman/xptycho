@@ -387,10 +387,10 @@ class PtychoModel:
         schedule = sorted(int(i) for i in self._recon['mode_schedule'])
         if estimate:
             schedule = schedule[:self.probe_modes - len(modes)]
-            if len(modes) + len(schedule) != self.probe_modes or (schedule and schedule[-1] > iterations):
+            if len(modes) + len(schedule) != self.probe_modes:
                 raise ValueError('the probe starts with {} modes and must reach probe_modes={}, so mode_schedule needs {} '
-                                 'iterations no later than {}; it is {}'.format(
-                                     len(modes), self.probe_modes, self.probe_modes - len(modes), iterations,
+                                 'iterations; it is {}'.format(
+                                     len(modes), self.probe_modes, self.probe_modes - len(modes),
                                      list(self._recon['mode_schedule'])))
             if schedule and self._recon['initial_probe_distance'] is None:
                 raise ValueError('adding a probe mode needs initial_probe_distance to be set')
