@@ -7,7 +7,7 @@ Mac.  In short:
 
 1. The scan: diffraction frames as detector counts and the scan
    positions in metres, from a CXI file, a TIFF folder, or arrays.
-2. The instrument facts: energy, detector distance, detector pixel,
+2. The instrument facts: energy, detector distance, detector pitch,
    detector center, dark frames, mask.
 3. What is known about the probe: an array to hold fixed, or the
    instruction to estimate it, with the number of modes.
@@ -20,7 +20,7 @@ batches over positions; reports every parameter with its provenance.
 
 ## What comes back
 
-The complex object image (magnitude and phase) with pixel size and
+The complex object image (magnitude and phase) with pixel pitch and
 origin, the probe modes, the coverage map, the positions, the
 convergence curves, and the parameter table.  One call writes the
 folder a laminography reconstruction in mbirtorch reads.

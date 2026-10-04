@@ -7,8 +7,8 @@ import os
 import numpy as np
 import pytest
 
-import xptycho
-from tiny import make_model, make_object, make_probe, make_second_mode, numbers
+import xptycho as xpt
+from tiny import PIXEL_PITCH, make_model, make_object, make_probe, make_second_mode, numbers
 
 BASELINE = json.load(open(os.path.join(os.path.dirname(__file__), 'data', 'tiny_blind_baseline.json')))
 TOLERANCE = 1e-3     # relative; the first iterations agree to about 1e-5
@@ -23,7 +23,7 @@ def setup(devices):
                        mode_energy_fraction=BASELINE['energy_ratio'],
                        initial_probe_distance=BASELINE['propagation_dist'])
     model.probe_modes = 2
-    return model, model.simulate(truth, modes), truth
+    return model, model.simulate(xpt.Sample(truth, modes, PIXEL_PITCH)), truth
 
 
 def close(mine, old):
@@ -44,8 +44,8 @@ def test_matches_old_code(devices, iterations):
     model, scan, truth = setup(devices)
     recon = model.recon(scan, iterations=iterations, verbose=0)
     old = BASELINE['iterates'][str(iterations)]
-    close(numbers(xptycho.match_scale(recon.object, truth)), old['object'])
+    close(numbers(xpt.match_scale(recon.object, truth)), old['object'])
     assert len(recon.probe) == len(old['probe'])
     for mine, theirs in zip(recon.probe, old['probe']):
         close(numbers(mine), theirs)
-    assert recon.curves['data_error'][-1] == pytest.approx(old['nrmse_meas'], rel=TOLERANCE)
+    assert recon.run.data_error[-1] == pytest.approx(old['nrmse_meas'], rel=TOLERANCE)

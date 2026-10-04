@@ -3,7 +3,7 @@ object is scanned by simulation and reconstructed from the frames alone."""
 import numpy as np
 import matplotlib.pyplot as plt
 
-import xptycho
+import xptycho as xpt
 
 # ------------------------------- Parameters -------------------------------
 OBJECT_SIZE = 192
@@ -11,9 +11,9 @@ FRAME_SIZE = 32
 SCAN_GRID = (17, 17)
 SCAN_STEP_PIXELS = 8
 MAX_OFFSET_PIXELS = 1.5
-PIXEL_SIZE = 1e-8               # m
+PIXEL_PITCH = 1e-8               # m
 WAVELENGTH = 1e-10              # m
-DETECTOR_PIXEL = 75e-6          # m
+DETECTOR_PITCH = 75e-6          # m
 PEAK_PHOTONS = 1e5
 ITERATIONS = 100
 # --------------------------------------------------------------------------
@@ -37,19 +37,19 @@ def make_probe(m):
 
 
 truth, probe = make_object(OBJECT_SIZE), make_probe(FRAME_SIZE)
-positions = xptycho.scan_positions(SCAN_GRID, SCAN_STEP_PIXELS * PIXEL_SIZE, MAX_OFFSET_PIXELS * PIXEL_SIZE)
-model = xptycho.PtychoModel(wavelength=WAVELENGTH, detector_pixel=DETECTOR_PIXEL, frame_size=FRAME_SIZE,
-                            detector_distance=PIXEL_SIZE * FRAME_SIZE * DETECTOR_PIXEL / WAVELENGTH,
-                            positions=positions)
+positions = xpt.scan_positions(SCAN_GRID, SCAN_STEP_PIXELS * PIXEL_PITCH, MAX_OFFSET_PIXELS * PIXEL_PITCH)
+model = xpt.PtychoModel(wavelength=WAVELENGTH, detector_pitch=DETECTOR_PITCH, frame_size=FRAME_SIZE,
+                        detector_distance=PIXEL_PITCH * FRAME_SIZE * DETECTOR_PITCH / WAVELENGTH,
+                        positions=positions)
 model.set_params(object_shape=truth.shape)
 model.configure_devices(devices=['cpu'])
-scan = model.simulate(truth, probe, peak_photons=PEAK_PHOTONS)
+scan = model.simulate(xpt.Sample(truth, probe, PIXEL_PITCH), peak_photons=PEAK_PHOTONS)
 recon = model.recon(scan, iterations=ITERATIONS, verbose=0)        # no probe given: it is estimated
 
 region = recon.scanned_region()
 rows, cols = np.flatnonzero(region.any(axis=1)), np.flatnonzero(region.any(axis=0))
 window = (slice(rows[0], rows[-1] + 1), slice(cols[0], cols[-1] + 1))
-estimate = xptycho.match_scale(recon.object, truth, region)
+estimate = xpt.match_scale(recon.object, truth, region)
 limits = dict(vmin=np.angle(truth[window]).min(), vmax=np.angle(truth[window]).max(), cmap='gray')
 
 fig, axes = plt.subplots(1, 4, figsize=(13, 3.6))

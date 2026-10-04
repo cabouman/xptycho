@@ -117,7 +117,7 @@ table.where th { font-size: 12px; letter-spacing: 0.06em; text-transform: upperc
     <div class="what">The measurement. Never modified.</div>
     <ul>
       <li><span class="chip data">data</span> the frames \(y_j\), in memory or read from a file in batches.</li>
-      <li><span class="chip fm">facts from the file</span> positions, wavelength, distance, detector pixel, as recorded. Read once, to build a model.</li>
+      <li><span class="chip fm">facts from the file</span> positions, wavelength, distance, detector pitch, as recorded. Read once, to build a model.</li>
       <li>Made by <code>Scan.load(path)</code>, by <code>model.simulate</code>, or by preprocessing raw frames.</li>
     </ul>
   </div>
@@ -135,7 +135,7 @@ table.where th { font-size: 12px; letter-spacing: 0.06em; text-transform: upperc
     <div class="what">The unknowns go in as arguments. They come back inside a <code>Reconstruction</code>.</div>
     <ul>
       <li><span class="chip unk">unknowns</span> the object image \(x\), complex, on the object grid; the probe modes \(d\), complex \((K, N_p, N_p)\). Given to <code>forward</code> and <code>simulate</code>; given to <code>recon</code> when known.</li>
-      <li><code>recon</code> returns a <code>Reconstruction</code> holding both unknowns (<code>object</code>, <code>probe</code>) and the record of the run: the parameter table the run used, the pixel size, origin, and coverage needed to read the image, and the data-error curve. Drawn in section 3.</li>
+      <li><code>recon</code> returns a <code>Reconstruction</code> holding both unknowns (<code>object</code>, <code>probe</code>) and the record of the run: the parameter table the run used, the pixel pitch, origin, and coverage needed to read the image, and the data-error curve. Drawn in section 3.</li>
       <li>It saves itself to a folder and loads back, so a cluster job's output is one thing.</li>
     </ul>
   </div>
@@ -178,7 +178,7 @@ table.where th { font-size: 12px; letter-spacing: 0.06em; text-transform: upperc
       </ul>
     </div>
   </div>
-  <p class="derived">Derived from the forward-model parameters, read-only: the object pixel size \(\lambda L / (N_p \Delta_{\mathrm{det}})\), the positions in pixels, the object grid shape and origin, the patch operators \(P_j\).</p>
+  <p class="derived">Derived from the forward-model parameters, read-only: the object pixel pitch \(\lambda L / (N_p \Delta_{\mathrm{det}})\), the positions in pixels, the object grid shape and origin, the patch operators \(P_j\).</p>
   <div class="methods">
     <h4>Methods</h4>
     <p style="font-size:13px;color:var(--muted);margin:0 0 6px">Written as a user calls them: <code>PtychoModel(…)</code> builds one, and <code>model.name(…)</code> is a method of the instance <code>model</code>. The one classmethod is marked.</p>
@@ -190,7 +190,7 @@ table.where th { font-size: 12px; letter-spacing: 0.06em; text-transform: upperc
       <div class="meth"><code>model.configure_devices(num_devices=1, devices=None)</code><span>Choose the devices, as in mbirtorch: a count of GPUs, or an explicit list. Without a call the model chooses automatically. See <a href="computing.html">Computing</a>, section 4.</span></div>
       <div class="meth"><code>model.print_params()</code><span>Print every parameter with its value, units, and origin (given, file, derived, default).</span></div>
       <div class="meth"><code>model.forward(x, d)</code><span><b>The forward model.</b> For every scan position: cut the patch out of <code>x</code>, multiply by each probe mode, far-field transform, sum the modes in intensity. Returns the noiseless amplitudes \(y_j\), shape \((J, N_p, N_p)\). Stores nothing.</span></div>
-      <div class="meth"><code>model.simulate(x, d, pixel_size=None, peak_photons=None, dark_rate=0, seed=0)</code><span>Calls <code>forward</code>, after checking that <code>pixel_size</code>, when given, equals the model's object pixel size, scales the intensities so the brightest sample is <code>peak_photons</code>, draws Poisson counts, and returns a <code>Scan</code> carrying this model's positions and instrument facts. Without <code>peak_photons</code>, the exact intensities.</span></div>
+      <div class="meth"><code>model.simulate(x, d, pixel_pitch=None, peak_photons=None, dark_rate=0, seed=0)</code><span>Calls <code>forward</code>, after checking that <code>pixel_pitch</code>, when given, equals the model's object pixel pitch, scales the intensities so the brightest sample is <code>peak_photons</code>, draws Poisson counts, and returns a <code>Scan</code> carrying this model's positions and instrument facts. Without <code>peak_photons</code>, the exact intensities.</span></div>
       <div class="meth"><code>model.recon(scan, probe=None, init_probe=None, init=None, iterations=…)</code><span><b>The reconstruction.</b> With <code>probe=</code>, the probe is known and held fixed. Without it, the probe is estimated: from <code>init_probe=</code> when given, else from the data-driven initialization. A given <code>probe=</code> must have all \(K\) modes. An estimate may start with fewer: one mode from the initialization, or however many <code>init_probe=</code> has, and reaches \(K\) by adding a mode at each iteration of <code>mode_schedule</code> (theory page, section 5). The schedule must have enough entries to reach \(K\), or <code>recon</code> refuses before it starts. <code>init=</code> warm-starts both unknowns from a previous <code>Reconstruction</code>. <code>iterations</code> is the one setting that changes on every call, so it is an argument here, as mbirtorch's <code>max_iterations</code> is. Returns a <code>Reconstruction</code>. The run state lives only inside this call.</span></div>
       <div class="meth"><code>model.data_error(scan, x, d)</code><span>The normalized distance between <code>forward(x, d)</code> and the scan's amplitudes. The curve <code>recon</code> reports, available on its own.</span></div>
       <div class="meth"><code>model.refine_positions(scan, x, d, max_shift=1)</code><span>One refinement pass: for each position, the integer shift within <code>max_shift</code> whose <code>forward</code> best matches the data, given <code>x</code> and <code>d</code>. Returns the refined positions and the per-position misfit. Changes nothing. Section 6.</span></div>
@@ -239,7 +239,7 @@ table.where th { font-size: 12px; letter-spacing: 0.06em; text-transform: upperc
       <h4>To read the image</h4>
       <div class="how">Derived from the forward-model parameters and the probe.</div>
       <ul>
-        <li><code>pixel_size</code>, <code>origin</code>: where the grid sits, in meters</li>
+        <li><code>pixel_pitch</code>, <code>origin</code>: where the grid sits, in meters</li>
         <li><code>coverage</code>: the accumulated probe weight; zero where no probe reached</li>
         <li><code>mode_energies</code>: the share of the probe energy in each mode</li>
         <li><code>positions</code>: the positions the run used</li>
@@ -260,7 +260,7 @@ table.where th { font-size: 12px; letter-spacing: 0.06em; text-transform: upperc
     <div class="meths">
       <div class="meth"><code>recon.summary()</code><span>The parameter table as text, then the iteration count, the final errors, the time, and the devices.</span></div>
       <div class="meth"><code>recon.show(directory=None, compare_to=None)</code><span>Magnitude and phase of the object over the coverage, the probe modes with their energy fractions, and the curves. With a truth, the error images and the NRMSE.</span></div>
-      <div class="meth"><code>recon.save(directory)</code><span>One folder: <code>summary.txt</code>, <code>parameters.csv</code>, <code>recon.h5</code> (object, probe, positions, coverage, curves, with pixel size and origin as attributes), preview images, <code>plots/</code>. <code>recon.h5</code> is the file a laminography reconstruction reads.</span></div>
+      <div class="meth"><code>recon.save(directory)</code><span>One folder: <code>summary.txt</code>, <code>parameters.csv</code>, <code>recon.h5</code> (object, probe, positions, coverage, curves, with pixel pitch and origin as attributes), preview images, <code>plots/</code>. <code>recon.h5</code> is the file a laminography reconstruction reads.</span></div>
       <div class="meth"><code>Reconstruction.load(directory) <em>classmethod</em></code><span>Read a folder written by <code>save</code>.</span></div>
     </div>
   </div>
@@ -271,19 +271,19 @@ table.where th { font-size: 12px; letter-spacing: 0.06em; text-transform: upperc
 
 <h2>4. The scripts</h2>
 <pre><span class="c"># 1. simulated scan, known probe (TCI 2023, Fig. 6)</span>
-truth = xptycho.demo_truth('synthetic')                            <span class="c"># truth.object, truth.probe, truth.pixel_size</span>
-model = xptycho.PtychoModel(energy=8.8, detector_distance=L, detector_pixel=p,
-                            frame_size=256, positions=pos, probe_modes=1)
-scan = model.simulate(truth.object, truth.probe, pixel_size=truth.pixel_size, peak_photons=1e4, seed=0)
+truth = xpt.demo_truth('synthetic')                                <span class="c"># truth.object, truth.probe, truth.pixel_pitch</span>
+model = xpt.PtychoModel(energy=8.8, detector_distance=L, detector_pitch=p,
+                        frame_size=256, positions=pos, probe_modes=1)
+scan = model.simulate(truth.object, truth.probe, pixel_pitch=truth.pixel_pitch, peak_photons=1e4, seed=0)
 model.set_params(object_data_fit=0.6, probe_weight_exponent=1.25, relaxation=0.5)
 model.print_params()
 recon = model.recon(scan, probe=truth.probe, iterations=100)      <span class="c"># probe given, held fixed</span>
-print(xptycho.nrmse(recon.object, truth.object))
+print(xpt.nrmse(recon.object, truth.object))
 recon.show(OUTPUT_DIR, compare_to=truth); recon.save(OUTPUT_DIR)
 
 <span class="c"># 2. measured scan, blind, two modes (TCI 2025)</span>
-scan = xptycho.Scan.load('gold_balls.h5')
-model = xptycho.PtychoModel.from_scan(scan, probe_modes=2)         <span class="c"># fmodel_params from the file</span>
+scan = xpt.Scan.load('gold_balls.h5')
+model = xpt.PtychoModel.from_scan(scan, probe_modes=2)             <span class="c"># fmodel_params from the file</span>
 model.set_params(object_data_fit=0.5, probe_data_fit=0.6, mode_schedule=[20],
                  initial_probe_distance=0.3e-6)
 model.configure_devices(num_devices=4, batch_size=512)

@@ -31,7 +31,7 @@ OBJ_DATA_FIT = 0.5
 PROBE_DATA_FIT = 0.6
 RHO = 0.5
 PROBE_EXP = 1.25
-PIXEL_SIZE = 1e-8               # m
+PIXEL_PITCH = 1e-8               # m
 WAVELENGTH = 1e-10              # m
 PROPAGATION_DIST = 2e-6         # m
 SECOND_MODE_SCALE = 0.4         # the second true mode relative to the first
@@ -58,7 +58,7 @@ def main():
     y_meas = np.sqrt(np.asarray(intensity, dtype=np.float32))
     ones = np.ones(obj.shape, dtype=np.complex64)
     init_probe = pu.gen_init_probe(y_meas, patch_bounds, ones, fres_propagation=True,
-                                   sampling_interval=PIXEL_SIZE, source_wl=WAVELENGTH,
+                                   sampling_interval=PIXEL_PITCH, source_wl=WAVELENGTH,
                                    propagation_dist=PROPAGATION_DIST)
     init_obj = pu.gen_init_obj(y_meas, patch_bounds, obj.shape, ref_probe=init_probe)
     recon_win = np.ones(obj.shape, dtype=np.float32)
@@ -78,7 +78,7 @@ def main():
                                     probe_data_fit_prm=PROBE_DATA_FIT, rho=RHO, probe_exp=PROBE_EXP,
                                     add_reg=False, add_mode=ADD_MODE, energy_ratio=ENERGY_RATIO,
                                     wavelength=WAVELENGTH, propagation_dist=PROPAGATION_DIST,
-                                    img_px_sz=PIXEL_SIZE)
+                                    img_px_sz=PIXEL_PITCH)
             est = np.asarray(result['object'], dtype=np.complex64)
             probe = np.asarray(result['probe'], dtype=np.complex64)
             np.save(os.path.join(run_dir, 'iterates', f'est_obj_iter_{n:02d}.npy'), est)
@@ -92,7 +92,7 @@ def main():
                            'see dev_scripts/baseline/capture_tiny_blind.py',
             'add_mode': ADD_MODE, 'energy_ratio': ENERGY_RATIO, 'obj_data_fit_prm': OBJ_DATA_FIT,
             'probe_data_fit_prm': PROBE_DATA_FIT, 'rho': RHO, 'probe_exp': PROBE_EXP,
-            'pixel_size': PIXEL_SIZE, 'wavelength': WAVELENGTH, 'propagation_dist': PROPAGATION_DIST,
+            'pixel_size': PIXEL_PITCH, 'wavelength': WAVELENGTH, 'propagation_dist': PROPAGATION_DIST,
             'second_mode_scale': SECOND_MODE_SCALE,
             'init_probe': iterate_numbers(init_probe), 'init_obj': iterate_numbers(init_obj),
             'iterates': records}

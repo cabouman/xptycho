@@ -5,10 +5,10 @@ the old ptycho_pmace code on this problem and stored the numbers in
 tests/data/tiny_baseline.json."""
 import numpy as np
 
-import xptycho
+import xptycho as xpt
 
 OBJECT_SIZE, PROBE_SIZE, GRID, SPACING = 64, 16, 7, 8
-PIXEL_SIZE, WAVELENGTH, DISTANCE = 1e-8, 1e-10, 1.0
+PIXEL_PITCH, WAVELENGTH, DISTANCE = 1e-8, 1e-10, 1.0
 
 
 def make_object(n=OBJECT_SIZE):
@@ -28,14 +28,14 @@ def make_positions():
     """Patch centers in meters, row then column."""
     centers = OBJECT_SIZE / 2 + (np.arange(GRID) - (GRID - 1) / 2) * SPACING
     rows, cols = np.meshgrid(np.round(centers), np.round(centers), indexing='ij')
-    return np.stack([rows.ravel(), cols.ravel()], axis=1) * PIXEL_SIZE
+    return np.stack([rows.ravel(), cols.ravel()], axis=1) * PIXEL_PITCH
 
 
 def make_model(devices=('cpu',), **recon_params):
     """A model of the tiny problem on the 64 x 64 grid of the baseline."""
-    model = xptycho.PtychoModel(wavelength=WAVELENGTH, detector_distance=DISTANCE,
-                                detector_pixel=WAVELENGTH * DISTANCE / (PROBE_SIZE * PIXEL_SIZE),
-                                frame_size=PROBE_SIZE, positions=make_positions())
+    model = xpt.PtychoModel(wavelength=WAVELENGTH, detector_distance=DISTANCE,
+                            detector_pitch=WAVELENGTH * DISTANCE / (PROBE_SIZE * PIXEL_PITCH),
+                            frame_size=PROBE_SIZE, positions=make_positions())
     model.set_params(object_shape=(OBJECT_SIZE, OBJECT_SIZE), object_origin=(0.0, 0.0), **recon_params)
     model.configure_devices(devices=list(devices))
     return model

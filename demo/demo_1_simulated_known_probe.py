@@ -8,23 +8,23 @@ at a peak of 1e4 photons.  The object and the probe are both known, so
 the reconstruction is scored against them.  The expected object NRMSE
 after 100 iterations is about 0.037.
 
-The ground truth downloads on first run (about 4 MB).  Run from the
+The ground truth downloads on first run (2 MB).  Run from the
 repository root.  The run takes a few seconds on a GPU.
 """
-import xptycho
+import xptycho as xpt
 
 # ---------------------------- Parameters ----------------------------
 # The instrument.  The detector distance is set below so that the object
-# pixel of the model equals the pixel size the ground truth was made at.
+# pixel of the model equals the pixel pitch the ground truth was made at.
 ENERGY = 8.8                    # keV
-DETECTOR_PIXEL = 75e-6          # m
+DETECTOR_PITCH = 75e-6          # m
 FRAME_SIZE = 256                # detector pixels per side
 
 # The scan, in units of the object pixel of the ground truth.
 SCAN_GRID = (12, 12)            # scan positions along each axis
 SCAN_STEP_PIXELS = 68           # object pixels between positions
 MAX_OFFSET_PIXELS = 5           # object pixels, random offset of each position
-PEAK_PHOTONS = 1e4              # photons at the brightest sample
+PEAK_PHOTONS = 1e4              # photons at the brightest detector pixel
 DARK_RATE = 0.5                 # mean dark counts per pixel
 SEED = 0
 
@@ -34,24 +34,28 @@ OBJECT_DATA_FIT = 0.7           # alpha_1 in the papers
 PROBE_WEIGHT_EXPONENT = 1.5     # kappa
 RELAXATION = 0.5                # rho
 
+# The ground truth, one HDF5 file holding a sample (an object and its probe).
+TRUTH_URL = 'https://www.datadepot.rcac.purdue.edu/bouman/data/demo_xptycho_synthetic.h5'
+DATA_DIR = './demo/input'
 OUTPUT_DIR = './demo/output/demo_1_simulated_known_probe'
 # --------------------------------------------------------------------
 
-# The ground truth: the paper's complex object and probe.
-truth = xptycho.demo_truth('synthetic')
-pixel = truth.pixel_size
+# Download the ground truth, unless it is already in DATA_DIR, and load it.
+# It is a Sample: the 1024 x 1024 complex object and the single 256 x 256
+# probe of the 2023 PMACE paper's synthetic experiment.
+truth = xpt.Sample.load(xpt.download(TRUTH_URL, DATA_DIR))
+pixel_pitch = truth.pixel_pitch
 
-positions = xptycho.scan_positions(SCAN_GRID, SCAN_STEP_PIXELS * pixel, MAX_OFFSET_PIXELS * pixel, seed=SEED)
-detector_distance = pixel * FRAME_SIZE * DETECTOR_PIXEL / xptycho.energy_to_wavelength(ENERGY)
-model = xptycho.PtychoModel(energy=ENERGY, detector_distance=detector_distance, detector_pixel=DETECTOR_PIXEL,
-                            frame_size=FRAME_SIZE, positions=positions)
+positions = xpt.scan_positions(SCAN_GRID, SCAN_STEP_PIXELS * pixel_pitch, MAX_OFFSET_PIXELS * pixel_pitch, seed=SEED)
+detector_distance = pixel_pitch * FRAME_SIZE * DETECTOR_PITCH / xpt.energy_to_wavelength(ENERGY)
+model = xpt.PtychoModel(energy=ENERGY, detector_distance=detector_distance, detector_pitch=DETECTOR_PITCH,
+                        frame_size=FRAME_SIZE, positions=positions)
 model.set_params(object_shape=truth.object.shape)
 
 # Simulate the scan: the forward model at every position, then Poisson counts.
-scan = model.simulate(truth.object, truth.probe, pixel_size=pixel, peak_photons=PEAK_PHOTONS,
-                      dark_rate=DARK_RATE, seed=SEED)
+scan = model.simulate(truth, peak_photons=PEAK_PHOTONS, dark_rate=DARK_RATE, seed=SEED)
 print(scan.summary())
-scan.show(OUTPUT_DIR)
+scan.show(OUTPUT_DIR, block=False)          # one frame and the scan positions; stays open
 
 model.set_params(object_data_fit=OBJECT_DATA_FIT, probe_weight_exponent=PROBE_WEIGHT_EXPONENT,
                  relaxation=RELAXATION)
@@ -61,5 +65,8 @@ model.print_params()
 recon = model.recon(scan, probe=truth.probe, iterations=ITERATIONS)
 
 print(recon.summary())
+recon.save(OUTPUT_DIR + '/recon.h5')          # the object, the probe, and the record of the run
+
+# The object against the truth, the probe, and the convergence of the data error.
+# Each figure is saved in OUTPUT_DIR and shown on the screen; close the windows to end.
 recon.show(OUTPUT_DIR, compare_to=truth)
-recon.save(OUTPUT_DIR)

@@ -13,7 +13,7 @@ together, with one or more probe modes.  The arithmetic runs through
 PyTorch on a CPU, on one GPU, or divided among the GPUs of one node.
 
 The output is the complex object image, magnitude and phase both
-retained, with its pixel size and origin, in a form that feeds a 3-D
+retained, with its pixel pitch and origin, in a form that feeds a 3-D
 laminography reconstruction in
 [mbirtorch](https://github.com/cabouman/mbirtorch).
 

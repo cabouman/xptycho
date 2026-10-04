@@ -7,20 +7,20 @@ User API
 xptycho has three objects.  A :class:`~xptycho.Scan` holds the
 measurement.  A :class:`~xptycho.PtychoModel` holds the parameters and
 the forward model.  Its :meth:`~xptycho.PtychoModel.recon` method
-returns a :class:`~xptycho.Reconstruction`: the object, the probe, and
-the record of the run.  The design is described on the
+returns a :class:`~xptycho.Sample`: the object and the probe, with the
+record of the run.  A ground truth is also a :class:`~xptycho.Sample`.  The design is described on the
 `design pages <https://cabouman.github.io/xptycho/>`_.
 
 .. code-block:: python
 
-    scan = xptycho.Scan.load('scan.h5')
-    model = xptycho.PtychoModel.from_scan(scan, probe_modes=2)
+    scan = xpt.Scan.load('scan.h5')
+    model = xpt.PtychoModel.from_scan(scan, probe_modes=2)
     model.set_params(object_data_fit=0.5, mode_schedule=[20], initial_probe_distance=0.3e-6)
     recon = model.recon(scan, iterations=200)        # probe not given, so estimated
 
     print(recon.summary())
     recon.show(OUTPUT_DIR)
-    recon.save(OUTPUT_DIR)
+    recon.save(OUTPUT_DIR + '/recon.h5')
 
 The model
 ---------
@@ -34,15 +34,45 @@ The scan
 .. autoclass:: xptycho.Scan
    :members:
 
-The reconstruction
-------------------
+The sample
+----------
 
-.. autoclass:: xptycho.Reconstruction
+.. autoclass:: xptycho.Sample
    :members:
+
+.. autoclass:: xptycho.RunRecord
 
 .. autofunction:: xptycho.nrmse
 
 .. autofunction:: xptycho.match_scale
+
+File format
+-----------
+
+A scan and a sample are groups of an HDF5 file.  One file may hold either or both; each
+class reads and writes only its own groups and keeps the others.  Lengths are in meters.
+
+.. code-block:: text
+
+    file.h5                 attribute: format_version
+        /scan               attributes: wavelength, detector_distance, detector_pitch, name
+            frames          (J, n, n) intensities
+            positions       (J, 2), row and column of each probe center
+        /sample             attributes: pixel_pitch, origin, name
+            object          complex64 (rows, cols)
+            probe           complex64 (K, n, n)
+        /run                attribute: iterations.  Present for a reconstruction.
+            parameters      (N, 4) text: name, value, units, origin
+            data_error      (iterations,)
+            positions       (J, 2), the positions the run used
+            coverage        (rows, cols), the accumulated probe weight
+
+Demo tools
+----------
+
+.. autofunction:: xptycho.download
+
+.. autofunction:: xptycho.scan_positions
 
 Operators
 ---------

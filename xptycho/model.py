@@ -8,7 +8,7 @@ from scipy.ndimage import gaussian_filter
 from . import operators as op
 from ._sharding import Layout
 from .pmace import Run, fresnel_propagate
-from .reconstruction import Reconstruction
+from .sample import RunRecord, Sample
 from .scan import HC_KEV_M, Scan, energy_to_wavelength
 
 # name: (default, units)
@@ -37,13 +37,13 @@ class PtychoModel:
     :meth:`set_params` and :meth:`get_params`.  The devices are chosen with
     :meth:`configure_devices`.  The object and the probe are arguments of
     :meth:`forward`, :meth:`simulate`, and :meth:`recon`, and come back
-    from :meth:`recon` in a :class:`~xptycho.Reconstruction`.
+    from :meth:`recon` in a :class:`~xptycho.Sample`.
 
     Args:
         wavelength (float, optional): meters.  Give this or ``energy``.
         energy (float, optional): keV.
         detector_distance (float): meters, object to detector.
-        detector_pixel (float): meters, the detector pixel pitch.
+        detector_pitch (float): meters, the detector pixel pitch.
         frame_size (int): the frames are ``frame_size`` square; even.
         positions (ndarray): ``(J, 2)``, the row and column of the center
             of each probe position on the object, in meters.
@@ -58,7 +58,7 @@ class PtychoModel:
             recon = model.recon(scan, iterations=200)
     """
 
-    def __init__(self, *, wavelength=None, energy=None, detector_distance, detector_pixel,
+    def __init__(self, *, wavelength=None, energy=None, detector_distance, detector_pitch,
                  frame_size, positions, probe_modes=1, _origin='given'):
         if (wavelength is None) == (energy is None):
             raise ValueError('give exactly one of wavelength (meters) and energy (keV)')
@@ -69,7 +69,7 @@ class PtychoModel:
             raise ValueError('positions must have shape (J, 2); got {}'.format(positions.shape))
         self.wavelength = float(wavelength) if wavelength is not None else energy_to_wavelength(energy)
         self.detector_distance = float(detector_distance)
-        self.detector_pixel = float(detector_pixel)
+        self.detector_pitch = float(detector_pitch)
         self.frame_size = int(frame_size)
         self.positions = positions
         self.probe_modes = int(probe_modes)
@@ -83,7 +83,7 @@ class PtychoModel:
         """Build a model from the facts a scan recorded.  Any constructor
         argument passed here overrides the scan's value."""
         facts = dict(wavelength=scan.wavelength, detector_distance=scan.detector_distance,
-                     detector_pixel=scan.detector_pixel, frame_size=scan.frame_size,
+                     detector_pitch=scan.detector_pitch, frame_size=scan.frame_size,
                      positions=scan.positions)
         if 'energy' in overrides:
             facts.pop('wavelength')
@@ -92,10 +92,10 @@ class PtychoModel:
 
     # ------------------------------------------------------------ parameters
     @property
-    def pixel_size(self):
-        """The size of an object pixel in meters: wavelength times
-        detector distance over frame size times detector pixel."""
-        return self.wavelength * self.detector_distance / (self.frame_size * self.detector_pixel)
+    def pixel_pitch(self):
+        """The object pixel pitch in meters: wavelength times
+        detector distance over frame size times detector pitch."""
+        return self.wavelength * self.detector_distance / (self.frame_size * self.detector_pitch)
 
     def set_params(self, **params):
         """Set reconstruction parameters by name.  ``positions`` may also be
@@ -119,8 +119,8 @@ class PtychoModel:
         def one(name):
             if name in self._recon:
                 return self._recon[name]
-            if name in ('wavelength', 'detector_distance', 'detector_pixel', 'frame_size', 'positions',
-                        'probe_modes', 'pixel_size'):
+            if name in ('wavelength', 'detector_distance', 'detector_pitch', 'frame_size', 'positions',
+                        'probe_modes', 'pixel_pitch'):
                 return getattr(self, name)
             raise ValueError('"{}" is not a parameter'.format(name))
         return one(names) if isinstance(names, str) else [one(n) for n in names]
@@ -133,11 +133,11 @@ class PtychoModel:
             ('wavelength', self.wavelength, 'm', self._fmodel_origin),
             ('energy', HC_KEV_M / self.wavelength, 'keV', 'derived'),
             ('detector_distance', self.detector_distance, 'm', self._fmodel_origin),
-            ('detector_pixel', self.detector_pixel, 'm', self._fmodel_origin),
+            ('detector_pitch', self.detector_pitch, 'm', self._fmodel_origin),
             ('frame_size', self.frame_size, 'pixels', self._fmodel_origin),
             ('positions', '{} positions'.format(len(self.positions)), 'm', self._fmodel_origin),
             ('probe_modes', self.probe_modes, '', 'given'),
-            ('pixel_size', self.pixel_size, 'm', 'derived'),
+            ('pixel_pitch', self.pixel_pitch, 'm', 'derived'),
         ]
         for name, (_, units) in RECON_DEFAULTS.items():
             value, source = self._recon[name], 'given' if name in self._given else 'default'
@@ -166,10 +166,10 @@ class PtychoModel:
         shape, origin = self._recon['object_shape'], self._recon['object_origin']
         if origin is None and shape is not None:
             # A given shape with no origin: the grid is centered on position zero.
-            origin = tuple(-(n // 2) * self.pixel_size for n in shape)
+            origin = tuple(-(n // 2) * self.pixel_pitch for n in shape)
         if origin is None:
-            first = np.round(self.positions / self.pixel_size).astype(np.int64) - self.frame_size // 2
-            origin = tuple(float(v) for v in first.min(axis=0) * self.pixel_size)
+            first = np.round(self.positions / self.pixel_pitch).astype(np.int64) - self.frame_size // 2
+            origin = tuple(float(v) for v in first.min(axis=0) * self.pixel_pitch)
         if shape is None:
             starts = self._starts(origin)
             shape = tuple(int(v) for v in starts.max(axis=0) + self.frame_size)
@@ -177,7 +177,7 @@ class PtychoModel:
 
     def _starts(self, origin):
         """The row and column of the first pixel of each patch on the grid."""
-        centers = np.round((self.positions - np.asarray(origin)) / self.pixel_size).astype(np.int64)
+        centers = np.round((self.positions - np.asarray(origin)) / self.pixel_pitch).astype(np.int64)
         return centers - self.frame_size // 2
 
     def _layout(self):
@@ -270,16 +270,17 @@ class PtychoModel:
             out[first:first + step] = torch.sqrt(intensity).cpu().numpy()
         return out
 
-    def simulate(self, x, d, pixel_size=None, peak_photons=None, dark_rate=0.0, seed=0):
-        """Simulate a scan of a known object with a known probe.
+    def simulate(self, sample, peak_photons=None, dark_rate=0.0, seed=0):
+        """Simulate a scan of a known sample.
 
         Args:
-            x, d: as in :meth:`forward`.
-            pixel_size (float, optional): meters, the pixel size ``x`` was
-                made at.  When given it must equal the model's.
+            sample (Sample): the object and the probe.  Its object must have
+                the shape of the object grid and its pixel pitch must equal
+                the model's.
             peak_photons (float, optional): the counts at the brightest
-                sample.  Poisson counts are drawn from the intensities
-                scaled to this peak.  None returns the exact intensities.
+                detector pixel.  Poisson counts are drawn from the
+                intensities scaled to this peak.  None returns the exact
+                intensities.
             dark_rate (float, optional): the mean dark counts per pixel,
                 added as a second Poisson term.  Defaults to 0.
             seed (int, optional): the random seed of the counts.
@@ -287,9 +288,10 @@ class PtychoModel:
         Returns:
             Scan: with this model's positions and instrument facts.
         """
-        if pixel_size is not None and not np.isclose(pixel_size, self.pixel_size, rtol=1e-6):
-            raise ValueError('the object has pixel size {:.6g} m but the model has {:.6g} m'.format(pixel_size, self.pixel_size))
-        intensity = self.forward(x, d) ** 2
+        if not np.isclose(sample.pixel_pitch, self.pixel_pitch, rtol=1e-6):
+            raise ValueError('the sample has pixel pitch {:.6g} m but the model has {:.6g} m'.format(
+                sample.pixel_pitch, self.pixel_pitch))
+        intensity = self.forward(sample.object, sample.probe) ** 2
         if peak_photons is not None:
             rng = np.random.default_rng(seed)
             frames = rng.poisson(intensity * (peak_photons / intensity.max()))
@@ -297,7 +299,7 @@ class PtychoModel:
                 frames = frames + rng.poisson(dark_rate, size=frames.shape)
             intensity = frames.astype(np.float32)
         return Scan(intensity, self.positions, wavelength=self.wavelength,
-                    detector_distance=self.detector_distance, detector_pixel=self.detector_pixel)
+                    detector_distance=self.detector_distance, detector_pitch=self.detector_pitch)
 
     def data_error(self, scan, x, d):
         """The normalized root mean square difference between the scan's
@@ -357,7 +359,7 @@ class PtychoModel:
         gain = current - errors.min(dim=0).values
         misfit = torch.where(current > 0, gain / current, torch.zeros_like(gain)).cpu().numpy()
         shift = torch.tensor(shifts, device=device)[best].cpu().numpy()
-        return self.positions + shift * self.pixel_size, misfit
+        return self.positions + shift * self.pixel_pitch, misfit
 
     # ------------------------------------------------------------ the start
     def initial_probe(self, scan):
@@ -372,7 +374,7 @@ class PtychoModel:
         probe = (total / len(y)).numpy() / (1 + 1e-6)
         distance = self._recon['initial_probe_distance']
         if distance is not None:
-            probe = fresnel_propagate(probe, self.wavelength, distance, self.pixel_size)
+            probe = fresnel_propagate(probe, self.wavelength, distance, self.pixel_pitch)
         probe = (gaussian_filter(probe.real, INITIAL_FILTER_SIGMA)
                  + 1j * gaussian_filter(probe.imag, INITIAL_FILTER_SIGMA))
         return probe.astype(np.complex64)[None]
@@ -410,15 +412,15 @@ class PtychoModel:
             init_probe (ndarray, optional): the starting probe when the
                 probe is estimated.  It may have fewer modes than
                 ``probe_modes``.  Defaults to :meth:`initial_probe`.
-            init (Reconstruction, optional): start from a previous result:
-                its object, and its probe when the probe is estimated and
-                ``init_probe`` is not given.
+            init (Sample, optional): start from this sample: its object,
+                and its probe when the probe is estimated and ``init_probe``
+                is not given.
             iterations (int, optional): iterations to run.  Defaults to 100.
             verbose (int, optional): 1 (the default) prints one line per
                 iteration; 0 prints nothing.
 
         Returns:
-            Reconstruction: the object, the probe, and the record of the run.
+            Sample: the object, the probe, and ``run``, the record of the run.
         """
         start_time = time.time()
         y = self._amplitudes(scan)
@@ -465,7 +467,7 @@ class PtychoModel:
             run.update_object()         # the most important line: one PMACE update of the object
             if estimate:
                 if iteration in schedule:
-                    run.add_mode(self.wavelength, self._recon['initial_probe_distance'], self.pixel_size)
+                    run.add_mode(self.wavelength, self._recon['initial_probe_distance'], self.pixel_pitch)
                     if verbose:
                         print('iteration {}: mode {} added, {:g}% of the energy'.format(
                             iteration, len(run.modes), 100 * self._recon['mode_energy_fraction']))
@@ -479,5 +481,5 @@ class PtychoModel:
         params.append(dict(name='probe', value='estimated' if estimate else 'given', units='', origin='given'))
         params.append(dict(name='seconds', value=round(time.time() - start_time, 3), units='s', origin='derived'))
         _, origin = self._grid()
-        return Reconstruction(run.object(), run.probe(), self.pixel_size, origin, run.coverage_map(),
-                              self.positions.copy(), params, {'data_error': errors}, iterations)
+        record = RunRecord(params, errors, iterations, self.positions.copy(), run.coverage_map())
+        return Sample(run.object(), run.probe(), self.pixel_pitch, origin, scan.name, record)

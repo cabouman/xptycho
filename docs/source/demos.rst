@@ -44,35 +44,37 @@ Each demo writes one folder, ``demo/output/<script name>``:
      - The probe modes, one per row, with the share of the energy in each.
    * - ``data_error.png``
      - The mismatch between the data and the forward model at each iteration.
-   * - ``summary.txt``, ``parameters.csv``
-     - Every parameter of the run with its units and origin, and the outcome.
    * - ``recon.h5``
-     - The object, the probe, the positions, and the coverage, with the pixel size.
+     - The reconstruction, a :class:`~xptycho.Sample`: the object and the probe, with the
+       record of the run (every parameter with its units and origin, the data error at each
+       iteration, the positions, and the coverage).
 
 Demo data
 ---------
 
-The demos start from known objects and probes, loaded with
-:func:`~xptycho.demo_truth`, and simulate their own frames.  The data is one small archive
-(about 4 MB) that downloads on first run to ``demo/input``, or to the directory named by the
-environment variable ``XPTYCHO_DATA_DIR``.
-
-.. list-table::
-   :header-rows: 1
-   :widths: 18 82
-
-   * - Name
-     - Contents
-   * - ``synthetic``
-     - The complex object and the probe of the synthetic experiment of the 2023 PMACE paper.
-   * - ``blind``
-     - The complex object and the two probe modes of the 2025 blind multi-mode paper.
+The demos start from a known object and probe and simulate their own frames.  Each ground
+truth is one HDF5 file holding a :class:`~xptycho.Sample`.  The demo script names the
+address and the local folder, downloads the file on first run, and loads it:
 
 .. code-block:: python
 
-    truth = xptycho.demo_truth('blind')
+    TRUTH_URL = 'https://www.datadepot.rcac.purdue.edu/bouman/data/demo_xptycho_blind.h5'
+    DATA_DIR = './demo/input'
+
+    truth = xpt.Sample.load(xpt.download(TRUTH_URL, DATA_DIR))
     truth.object          # complex image
     truth.probe           # complex, (modes, size, size)
-    truth.pixel_size      # meters
+    truth.pixel_pitch     # meters
+
+.. list-table::
+   :header-rows: 1
+   :widths: 34 66
+
+   * - File
+     - Contents
+   * - ``demo_xptycho_synthetic.h5`` (2 MB)
+     - The complex object and the probe of the synthetic experiment of the 2023 PMACE paper.
+   * - ``demo_xptycho_blind.h5`` (3 MB)
+     - The complex object and the two probe modes of the 2025 blind multi-mode paper.
 
 The papers are cited in :ref:`Credits <CreditsDocs>`.

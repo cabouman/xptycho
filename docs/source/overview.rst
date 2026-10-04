@@ -63,7 +63,7 @@ Three objects
       :columns: 12 12 4 4
 
       **The measurement.**  The diffraction frames, the scan positions, and
-      the instrument facts: wavelength, detector distance, detector pixel.
+      the instrument facts: wavelength, detector distance, detector pitch.
       Never modified.
 
    .. grid-item-card:: PtychoModel
@@ -71,23 +71,24 @@ Three objects
 
       **The parameters and the forward model.**  Built from a scan.  Its
       ``recon`` method reconstructs; its ``simulate`` method makes a scan from
-      a known object and probe.
+      a known sample.
 
-   .. grid-item-card:: Reconstruction
+   .. grid-item-card:: Sample
       :columns: 12 12 4 4
 
-      **The result.**  The object, the probe, the pixel size, and the record
-      of the run.  It shows itself, saves itself, and can start another run.
+      **The object and its probe.**  A ground truth and a reconstruction are
+      both a sample; a reconstruction also carries the record of its run.  It
+      shows itself, saves itself, and can start another run.
 
 .. code-block:: python
 
-   import xptycho
+   import xptycho as xpt
 
-   scan = xptycho.Scan.load('scan.h5')          # frames, positions, instrument facts
-   model = xptycho.PtychoModel.from_scan(scan)  # the forward model
+   scan = xpt.Scan.load('scan.h5')          # frames, positions, instrument facts
+   model = xpt.PtychoModel.from_scan(scan)  # the forward model
    recon = model.recon(scan, iterations=100)    # no probe given: it is estimated
    recon.show()                                 # object, probe, data-error curve
-   recon.save('./output')                       # recon.h5, parameters, summary
+   recon.save('./output/recon.h5')              # the sample and the record of the run
 
 Speed
 -----

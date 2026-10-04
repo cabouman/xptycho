@@ -1,82 +1,38 @@
-"""The demo data: known objects and probes to simulate from and score
-against, and simple scan patterns."""
-import json
+"""Tools for demos: a file download and simple scan patterns."""
 import os
 import subprocess
-import tarfile
 import urllib.error
 import urllib.request
 
 import numpy as np
 
-DATA_URL = 'https://www.datadepot.rcac.purdue.edu/bouman/data/demo_xptycho_data.tgz'
-DATA_FOLDER = 'demo_xptycho_data'
 
-
-class Truth:
-    """A known object and probe.
-
-    Attributes:
-        object (ndarray): complex64 ``(rows, cols)``.
-        probe (ndarray): complex64 ``(K, n, n)``, the probe modes.
-        pixel_size (float): meters, the object pixel both were made at.
-        name (str): the name of the dataset.
-    """
-
-    def __init__(self, object, probe, pixel_size, name):
-        self.object = object
-        self.probe = probe
-        self.pixel_size = pixel_size
-        self.name = name
-
-
-def data_directory():
-    """Where demo data is kept: ``$XPTYCHO_DATA_DIR``, else ``./demo/input``."""
-    return os.environ.get('XPTYCHO_DATA_DIR', os.path.join('.', 'demo', 'input'))
-
-
-def fetch():
-    """Return the folder of the demo data, downloading it on first use."""
-    folder = os.path.join(data_directory(), DATA_FOLDER)
-    if os.path.isdir(folder):
-        return folder
-    os.makedirs(data_directory(), exist_ok=True)
-    archive = os.path.join(data_directory(), os.path.basename(DATA_URL))
-    print('downloading {} to {}'.format(DATA_URL, archive))
-    try:
-        urllib.request.urlretrieve(DATA_URL, archive)
-    except urllib.error.URLError:
-        # The data server does not send its intermediate certificate, which
-        # Python cannot verify without it; curl can.
-        result = subprocess.run(['curl', '-L', '--fail', '-sS', '-o', archive, DATA_URL], capture_output=True, text=True)
-        if result.returncode != 0:
-            raise RuntimeError('could not download {}: {}.  Download it by hand and extract it in {}'.format(
-                DATA_URL, result.stderr.strip(), data_directory()))
-    with tarfile.open(archive) as tar:
-        tar.extractall(data_directory(), filter='data')
-    os.remove(archive)
-    return folder
-
-
-def demo_truth(name):
-    """Load a known object and probe from the demo data.
+def download(url, directory):
+    """Download a file into a directory, unless it is already there.
 
     Args:
-        name (str): ``'synthetic'``, the object and probe of the synthetic
-            experiment of the 2023 PMACE paper; or ``'blind'``, the object
-            and the two probe modes of the 2025 paper.
+        url (str): the address of the file.
+        directory (str): the local directory.  It is created if needed.
 
     Returns:
-        Truth: with ``object``, ``probe``, and ``pixel_size``.
+        str: the path of the local file, named as in the address.
     """
-    folder = os.path.join(fetch(), name)
-    if not os.path.isdir(folder):
-        raise ValueError('"{}" is not a demo dataset; the datasets are: {}'.format(name, ', '.join(sorted(os.listdir(fetch())))))
-    facts = json.load(open(os.path.join(folder, 'truth.json')))
-    probe = np.load(os.path.join(folder, 'probe.npy')).astype(np.complex64)
-    if probe.ndim == 2:
-        probe = probe[None]
-    return Truth(np.load(os.path.join(folder, 'object.npy')).astype(np.complex64), probe, facts['pixel_size'], name)
+    path = os.path.join(directory, os.path.basename(url))
+    if os.path.isfile(path):
+        return path
+    os.makedirs(directory, exist_ok=True)
+    print('downloading {} to {}'.format(url, path))
+    partial = path + '.part'
+    try:
+        urllib.request.urlretrieve(url, partial)
+    except urllib.error.URLError:
+        # Some servers do not send their intermediate certificate, which
+        # Python cannot verify without it; curl can.
+        result = subprocess.run(['curl', '-L', '--fail', '-sS', '-o', partial, url], capture_output=True, text=True)
+        if result.returncode != 0:
+            raise RuntimeError('could not download {}: {}'.format(url, result.stderr.strip()))
+    os.replace(partial, path)
+    return path
 
 
 def scan_positions(grid, step, max_offset=0.0, seed=0):

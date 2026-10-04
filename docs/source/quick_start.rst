@@ -37,34 +37,35 @@ Put your data in two numpy arrays and three numbers:
 - ``positions``: a 2D array with shape ``(positions, 2)``: the row and the column of the
   center of the probe on the object at each frame, **in meters**.
 - The photon ``energy`` in keV (or the ``wavelength`` in meters), the ``detector_distance``
-  in meters from the object to the detector, and the ``detector_pixel`` pitch in meters.
+  in meters from the object to the detector, and the ``detector_pitch`` pitch in meters.
 
 These go into a :class:`~xptycho.Scan`.  A :class:`~xptycho.PtychoModel` is built from the
 scan, and its :meth:`~xptycho.PtychoModel.recon` method does the reconstruction::
 
-    import xptycho
+    import xptycho as xpt
 
-    scan = xptycho.Scan(frames, positions, energy=8.8, detector_distance=2.0, detector_pixel=75e-6)
+    scan = xpt.Scan(frames, positions, energy=8.8, detector_distance=2.0, detector_pitch=75e-6)
     print(scan.summary())
     scan.show()                                   # one frame and the map of positions
 
-    model = xptycho.PtychoModel.from_scan(scan)
+    model = xpt.PtychoModel.from_scan(scan)
     model.print_params()                          # every parameter, its units, and its origin
     recon = model.recon(scan, iterations=100)     # no probe given, so it is estimated
 
     recon.show()                                  # the object, the probe, the data-error curve
-    recon.save('./output/my_scan')
-    image = recon.object                          # complex array; recon.pixel_size is in meters
+    recon.save('./output/my_scan.h5')
+    image = recon.object                          # complex array; recon.pixel_pitch is in meters
 
-The object pixel size is not something you choose.  It follows from the instrument:
-wavelength times detector distance, divided by frame size times detector pixel.  Check it in
+The object pixel pitch is not something you choose.  It follows from the instrument:
+wavelength times detector distance, divided by frame size times detector pitch.  Check it in
 the printed parameters; if it is wrong, one of the three numbers is wrong.
 
-The result is a :class:`~xptycho.Reconstruction`.  ``recon.object`` is the complex image,
-``recon.phase`` and ``recon.magnitude`` are its two parts, ``recon.probe`` holds the probe
-modes, and ``recon.curves['data_error']`` is the mismatch between the data and the forward
-model at each iteration.  ``recon.save`` writes a folder that
-:meth:`Reconstruction.load <xptycho.Reconstruction.load>` reads back.
+The result is a :class:`~xptycho.Sample`: the object and the probe it was seen with.
+``recon.object`` is the complex image, ``recon.phase`` and ``recon.magnitude`` are its two
+parts, and ``recon.probe`` holds the probe modes.  ``recon.run`` is the record of the run;
+``recon.run.data_error`` is the mismatch between the data and the forward model at each
+iteration.  ``recon.save`` writes an HDF5 file that
+:meth:`Sample.load <xptycho.Sample.load>` reads back.
 
 4. Adjust the reconstruction
 ----------------------------
@@ -86,7 +87,7 @@ the curvature of a focused beam and usually helps::
 **Several probe modes.**  A partially coherent beam needs more than one mode.  Say how many
 when you build the model, and at which iterations each extra mode is added::
 
-    model = xptycho.PtychoModel.from_scan(scan, probe_modes=2)
+    model = xpt.PtychoModel.from_scan(scan, probe_modes=2)
     model.set_params(mode_schedule=[20], initial_probe_distance=2e-6)
     recon = model.recon(scan, iterations=200)
     print(recon.mode_energies)                    # the share of the energy in each mode

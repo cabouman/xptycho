@@ -103,7 +103,7 @@ table.params th { font-size: 12px; letter-spacing: 0.06em; text-transform: upper
       <li>The scan positions, in meters.</li>
       <li>\(K\), the number of probe modes the model ends with: not a physical fact, but part of the assumed model. A blind run starts with one mode and reaches \(K\) on the mode schedule.</li>
     </ul>
-    <p style="margin:8px 0 0;font-size:14px">From these the model derives the object pixel size, \(\lambda L / (N_p \Delta_{\mathrm{det}})\) with \(L\) the detector distance (standard far-field sampling; not stated in the papers), the positions in pixels, and so the patch operators \(P_j\). Far-field propagation is a fixed assumption of the model, not a parameter.</p>
+    <p style="margin:8px 0 0;font-size:14px">From these the model derives the object pixel pitch, \(\lambda L / (N_p \Delta_{\mathrm{det}})\) with \(L\) the detector distance (standard far-field sampling; not stated in the papers), the positions in pixels, and so the patch operators \(P_j\). Far-field propagation is a fixed assumption of the model, not a parameter.</p>
   </div>
   <div class="card k-unk">
     <h3>Unknowns</h3>
@@ -144,7 +144,7 @@ table.params th { font-size: 12px; letter-spacing: 0.06em; text-transform: upper
 <h2>2. The forward model and the operators</h2>
 <p>The forward model is a function of the unknowns, specified by the forward-model parameters:</p>
 \[ y_j = \sqrt{\mathrm{Pois}\Big(\sum_{k=0}^{K-1} \big|\mathcal{F} D_k P_j x\big|^2\Big)} \]
-<p>Here \(P_j\) cuts patch \(j\) out of the object (from the positions and the pixel size), \(D_k = \mathrm{diag}(d_k)\) multiplies by probe mode \(k\), and \(\mathcal{F}\) is the orthonormal 2D DFT, the far-field propagation to the detector. The modes add in intensity, and the detector counts \(I_j = y_j^2\) are Poisson. Everything the algorithm does is built from these pieces and the four steps below.</p>
+<p>Here \(P_j\) cuts patch \(j\) out of the object (from the positions and the pixel pitch), \(D_k = \mathrm{diag}(d_k)\) multiplies by probe mode \(k\), and \(\mathcal{F}\) is the orthonormal 2D DFT, the far-field propagation to the detector. The modes add in intensity, and the detector counts \(I_j = y_j^2\) are Poisson. Everything the algorithm does is built from these pieces and the four steps below.</p>
 <div class="ops">
   <div class="op"><b>Building blocks</b>
     \(P_j^T\) adds a patch back into the image at position \(j\); \(\mathcal{F}^*\) is the inverse DFT.
@@ -204,7 +204,7 @@ table.params th { font-size: 12px; letter-spacing: 0.06em; text-transform: upper
 <p>Once per iteration for the patches, plus one averaging of the updated patches, and once more per mode for the probes when the probe is estimated. That is the entire communication pattern.</p>
 
 <h2>4. Initialization</h2>
-<p>As the code does it (<code>gen_init_probe</code>, <code>gen_init_obj</code>). The probe first, from the mean back-transformed data, propagated a chosen distance \(z\) by Fresnel propagation \(U\) at the wavelength \(\lambda\) and the object pixel size \(\Delta_x\), then smoothed by a Gaussian low-pass filter \(S\) with \(\sigma = 1\) pixel on the real and imaginary parts. This is the only place Fresnel propagation appears; the forward model is far-field throughout, and \(z\) is a reconstruction parameter.</p>
+<p>As the code does it (<code>gen_init_probe</code>, <code>gen_init_obj</code>). The probe first, from the mean back-transformed data, propagated a chosen distance \(z\) by Fresnel propagation \(U\) at the wavelength \(\lambda\) and the object pixel pitch \(\Delta_x\), then smoothed by a Gaussian low-pass filter \(S\) with \(\sigma = 1\) pixel on the real and imaginary parts. This is the only place Fresnel propagation appears; the forward model is far-field throughout, and \(z\) is a reconstruction parameter.</p>
 \[ d^{(0)} = S\left\{ U_{\lambda,z,\Delta_x}\left\{ \frac{1}{J}\sum_j \mathcal{F}^* y_j \right\} \right\} \]
 <p>Then the object, real-valued, so that each patch has the right scale: a constant patch of value \(\sqrt{\|y_j\| / \|d^{(0)}\|}\) per position, averaged over the coverage, pixels no patch reaches set to the median, then the same filter on the magnitude.</p>
 \[ x^{(0)} = S\left\{ \left| \Lambda_{0,\varepsilon}^{-1} \sum_j P_j^T \left( \sqrt{\frac{\|y_j\|}{\|d^{(0)}\|}}\; \mathbf{1} \right) \right| \right\}, \qquad \Lambda_0 = \sum_j P_j^T P_j \]
@@ -229,7 +229,7 @@ table.params th { font-size: 12px; letter-spacing: 0.06em; text-transform: upper
   <li><b>The state is as large as the data, times \((1+K)\), and the peak is higher.</b> As the algorithm is written, \(\mathbf{v}\), \(\mathbf{w}\), \(\mathbf{z}\) are alive together, and so are \(\mathbf{s}_k\) and \(\mathbf{r}_k\) for each mode. The old code keeps all of it in memory at once. For integrated-circuit scans that is what does not fit, so where the per-position state lives is the first design question, not an afterthought.</li>
   <li><b>The averaging step is scatter-add, divide by coverage, gather.</b> Nothing else touches the whole image. \(\Lambda_k\) is itself a scatter-add of \(|d_k|^\kappa\), recomputed every iteration in a blind run. The iteration does this averaging twice: once on \(2\mathbf{w}-\mathbf{v}\) for the Mann step, once on the updated \(\mathbf{v}\) for the reported image and the probe step.</li>
   <li><b>The probe pass has two global reductions per mode:</b> the mean of the copies, and the per-pixel deviation statistic for outlier replacement, which needs the mean first. Mode addition is one more: the mean of the back-transformed residuals.</li>
-  <li><b>The forward model is fixed by the forward-model parameters alone.</b> \(P_j\) comes from the positions and the pixel size; \(\mathcal{F}\) is the far-field assumption. The unknowns \(x\) and \(d_k\) are its inputs. Everything else in the algorithm is arithmetic on patches.</li>
+  <li><b>The forward model is fixed by the forward-model parameters alone.</b> \(P_j\) comes from the positions and the pixel pitch; \(\mathcal{F}\) is the far-field assumption. The unknowns \(x\) and \(d_k\) are its inputs. Everything else in the algorithm is arithmetic on patches.</li>
 </ol>
 
 <h2>7. Parameter names in the API</h2>

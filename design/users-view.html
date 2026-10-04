@@ -54,14 +54,14 @@ table.t td:first-child { font-family: var(--mono); font-size: 13px; white-space:
 <h2>1. The scripts</h2>
 
 <h3>Simulate and reconstruct with a known probe (demo 1, TCI 2023 Fig. 6)</h3>
-<pre>import xptycho
+<pre>import xptycho as xpt
 
-truth = xptycho.demo_truth('synthetic')             <span class="c"># truth.object, truth.probe, truth.pixel_size, from the demo data archive</span>
-positions = xptycho.scan_positions(grid=(12, 12), step=1.02e-6, max_offset=0.3e-6, seed=0)
+truth = xpt.demo_truth('synthetic')                 <span class="c"># truth.object, truth.probe, truth.pixel_pitch, from the demo data archive</span>
+positions = xpt.scan_positions(grid=(12, 12), step=1.02e-6, max_offset=0.3e-6, seed=0)
 
-model = xptycho.PtychoModel(energy=8.8, detector_distance=2.0, detector_pixel=75e-6,
-                            frame_size=256, positions=positions, probe_modes=1)
-scan = model.simulate(truth.object, truth.probe, pixel_size=truth.pixel_size, peak_photons=1e4, seed=0)
+model = xpt.PtychoModel(energy=8.8, detector_distance=2.0, detector_pitch=75e-6,
+                        frame_size=256, positions=positions, probe_modes=1)
+scan = model.simulate(truth.object, truth.probe, pixel_pitch=truth.pixel_pitch, peak_photons=1e4, seed=0)
 print(scan.summary())
 
 model.set_params(object_data_fit=0.6, probe_weight_exponent=1.25, relaxation=0.5)
@@ -70,20 +70,20 @@ recon = model.recon(scan, probe=truth.probe, iterations=100)
 print(recon.summary())
 recon.show('./output/demo_1', compare_to=truth)
 recon.save('./output/demo_1')</pre>
-<p class="note">The detector distance and pixel are chosen so the model's object pixel equals the truth's pixel size. <code>simulate</code> compares the <code>pixel_size</code> it is given with the model's and refuses a mismatch, naming both values.</p>
+<p class="note">The detector distance and pixel are chosen so the model's object pixel equals the truth's pixel pitch. <code>simulate</code> compares the <code>pixel_pitch</code> it is given with the model's and refuses a mismatch, naming both values.</p>
 
 <h3>Preprocess measured data, then reconstruct blind with two modes (demo 2, TCI 2025)</h3>
 <p class="note">Two scripts, because preprocessing is done once and reconstruction many times.</p>
 <pre><span class="c"># script one: raw file to scan file</span>
-path = xptycho.fetch('goldballs_cxi')                                <span class="c"># entry 65 of the CXI database, cxidb.org; downloaded once</span>
-scan = xptycho.preprocess(path, dark='mean_of_dark_frames', crop=512, apodization='tukey',
-                          energy=1.0, detector_distance=0.112)         <span class="c"># positions and detector pixel come from the file</span>
+path = xpt.fetch('goldballs_cxi')                                    <span class="c"># entry 65 of the CXI database, cxidb.org; downloaded once</span>
+scan = xpt.preprocess(path, dark='mean_of_dark_frames', crop=512, apodization='tukey',
+                      energy=1.0, detector_distance=0.112)         <span class="c"># positions and detector pitch come from the file</span>
 print(scan.summary()); scan.show('./output/goldballs')
 scan.save('goldballs.h5')
 
 <span class="c"># script two: reconstruct</span>
-scan = xptycho.Scan.load('goldballs.h5')
-model = xptycho.PtychoModel.from_scan(scan, probe_modes=2)
+scan = xpt.Scan.load('goldballs.h5')
+model = xpt.PtychoModel.from_scan(scan, probe_modes=2)
 model.set_params(object_data_fit=0.5, probe_data_fit=0.6, probe_weight_exponent=1.25,
                  relaxation=0.5, mode_schedule=[20], initial_probe_distance=0.3e-6)
 recon = model.recon(scan, iterations=200)                            <span class="c"># probe not given: estimated</span>
@@ -94,9 +94,9 @@ recon.show('./output/goldballs'); recon.save('./output/goldballs')</pre>
 recon = model.recon(scan, iterations=200)                            <span class="c"># the same call; the positions are divided among the GPUs</span></pre>
 
 <h3>Continue a finished run, and refine positions</h3>
-<pre>scan = xptycho.Scan.load('goldballs.h5')
-model = xptycho.PtychoModel.from_scan(scan, probe_modes=2)
-recon = xptycho.Reconstruction.load('./output/goldballs')
+<pre>scan = xpt.Scan.load('goldballs.h5')
+model = xpt.PtychoModel.from_scan(scan, probe_modes=2)
+recon = xpt.Reconstruction.load('./output/goldballs')
 new_pos, misfit = model.refine_positions(scan, recon.object, recon.probe, max_shift=1)
 model.set_params(positions=new_pos)
 recon = model.recon(scan, init=recon, iterations=100)</pre>
@@ -111,8 +111,8 @@ print(model.data_error(scan, recon.object, recon.probe))</pre>
   <tr><th>name</th><th>what it is</th></tr>
   <tr><td>Scan</td><td>the measurement: frames, recorded positions, instrument facts. <code>Scan.load(path)</code>, <code>scan.save(path)</code>, <code>scan.summary()</code>, <code>scan.show(dir)</code>, <code>scan.positions</code>, <code>scan.num_frames</code>, <code>scan.frame_shape</code></td></tr>
   <tr><td>PtychoModel</td><td>the parameters and the forward model; the <a href="objects.html">objects page</a>, section 2, lists every method</td></tr>
-  <tr><td>Reconstruction</td><td>what <code>recon</code> returns: <code>object</code>, <code>probe</code>, <code>pixel_size</code>, <code>origin</code>, <code>coverage</code>, <code>positions</code>, <code>mode_energies</code>, <code>params</code>, <code>curves</code>; <code>summary()</code>, <code>show()</code>, <code>save()</code>, <code>Reconstruction.load()</code></td></tr>
-  <tr><td>demo_truth(name)</td><td>a record with <code>object</code>, <code>probe</code>, and <code>pixel_size</code>, read from the demo data archive (downloaded once); for simulation and for <code>compare_to=</code></td></tr>
+  <tr><td>Reconstruction</td><td>what <code>recon</code> returns: <code>object</code>, <code>probe</code>, <code>pixel_pitch</code>, <code>origin</code>, <code>coverage</code>, <code>positions</code>, <code>mode_energies</code>, <code>params</code>, <code>curves</code>; <code>summary()</code>, <code>show()</code>, <code>save()</code>, <code>Reconstruction.load()</code></td></tr>
+  <tr><td>demo_truth(name)</td><td>a record with <code>object</code>, <code>probe</code>, and <code>pixel_pitch</code>, read from the demo data archive (downloaded once); for simulation and for <code>compare_to=</code></td></tr>
   <tr><td>scan_positions(grid, step, max_offset, seed)</td><td>positions of a rectangular scan with random offsets, in meters</td></tr>
   <tr><td>fetch(name)</td><td>download a named public dataset once; returns the local path of the raw file</td></tr>
   <tr><td>preprocess(path, dark, crop, apodization, **facts)</td><td>a raw file to a <code>Scan</code>. <code>dark</code> is a dark frame array, or <code>'mean_of_dark_frames'</code> to average the dark frames the file holds. <code>crop</code> is the frame size kept about the beam center. <code>apodization='tukey'</code> multiplies each frame by a Tukey window (flat in the middle, tapering to zero at the edge). Instrument facts the file lacks are given as keywords.</td></tr>
@@ -126,7 +126,7 @@ print(model.data_error(scan, recon.object, recon.probe))</pre>
   <tr><th>name</th><th>kind</th><th>meaning</th></tr>
   <tr><td>energy / wavelength</td><td><span class="kind k-fm">fmodel</span></td><td>keV, or meters</td></tr>
   <tr><td>detector_distance</td><td><span class="kind k-fm">fmodel</span></td><td>meters, object to detector</td></tr>
-  <tr><td>detector_pixel</td><td><span class="kind k-fm">fmodel</span></td><td>meters, after any binning</td></tr>
+  <tr><td>detector_pitch</td><td><span class="kind k-fm">fmodel</span></td><td>meters, after any binning</td></tr>
   <tr><td>frame_size</td><td><span class="kind k-fm">fmodel</span></td><td>\(N_p\), detector pixels per side</td></tr>
   <tr><td>positions</td><td><span class="kind k-fm">fmodel</span></td><td>(J, 2), row then column, meters; settable, for refinement</td></tr>
   <tr><td>probe_modes</td><td><span class="kind k-fm">fmodel</span></td><td>\(K\)</td></tr>
@@ -145,7 +145,7 @@ print(model.data_error(scan, recon.object, recon.probe))</pre>
 <div class="ask">
   <ol>
     <li><b>Laminography series.</b> One model per scan (positions differ per tilt), with the series handled by a loop in the user's script, or one object holding all of them. Claude's view: one model per scan in version 1; a series object only if the loop proves awkward.</li>
-    <li><b><code>demo_truth</code> returns a record</b> (<code>object</code>, <code>probe</code>, <code>pixel_size</code>) that <code>compare_to=</code> takes directly, as written above. Confirm.</li>
+    <li><b><code>demo_truth</code> returns a record</b> (<code>object</code>, <code>probe</code>, <code>pixel_pitch</code>) that <code>compare_to=</code> takes directly, as written above. Confirm.</li>
     <li><b>Units of <code>energy</code>:</b> keV, as in the papers and the old configs.</li>
   </ol>
 </div>
