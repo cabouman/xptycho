@@ -27,7 +27,7 @@ Qiuchen Zhai.  The method is described in the following papers.
 Development
 -----------
 
-xptycho is developed by Charles A. Bouman and Brendt Wohlberg.
+xptycho is developed by Charles A. Bouman, Brendt Wohlberg, and Gregery T. Buzzard.
 
 Citation
 --------
@@ -37,7 +37,7 @@ following when referencing this software.
 ::
 
     @Misc {xptycho,
-    author = {Charles A. Bouman and Brendt Wohlberg},
+    author = {Charles A. Bouman and Brendt Wohlberg and Gregery T. Buzzard},
     title = {{xptycho: Ptychographic Reconstruction with PMACE in PyTorch}},
     howpublished = {Software library available from \url{https://github.com/cabouman/xptycho}},
     note = {Version 0.0.1},

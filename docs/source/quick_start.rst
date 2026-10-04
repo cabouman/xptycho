@@ -1,30 +1,118 @@
 .. _QuickStart:
 
-===========
-Quick Start
-===========
+===============
+Getting Started
+===============
 
-The script below simulates a scan of a known object, reconstructs it
-with the probe known and held fixed, and compares the result with the
-truth.  It is the first demo, ``demo/demo_1_simulated_known_probe.py``.
+This page takes you from installation to a reconstruction of your own data in four steps.
 
-.. literalinclude:: ../../demo/demo_1_simulated_known_probe.py
-   :language: python
+1. Install
+----------
 
-The second demo, ``demo/demo_2_simulated_blind_two_modes.py``, is given
-only the data.  It estimates the object and a probe with two modes.
+Follow the :ref:`installation instructions <InstallationDocs>`.  A conda environment or a
+Python virtual environment is recommended.
 
-.. literalinclude:: ../../demo/demo_2_simulated_blind_two_modes.py
-   :language: python
-   :start-after: # --------------------------------------------------------------------
+2. Run the first demo
+---------------------
 
-Known and unknown
------------------
+The demo scripts are in the `demo folder <https://github.com/cabouman/xptycho/blob/main/demo/>`__
+of the repository.  The first one simulates a scan of a known object, reconstructs it with
+the probe known, and compares the result with the truth.  Run it from the repository root::
 
-A probe passed to :meth:`~xptycho.PtychoModel.recon` as ``probe=`` is
-known and held fixed.  With no probe given, the probe is estimated with
-the object, starting from ``init_probe=`` when one is given and from the
-data otherwise.  ``probe_modes`` on the model is the number of modes the
-run ends with; an estimate starts with one mode and adds one at each
-iteration of the ``mode_schedule`` parameter.  The devices and the batch
-size are chosen automatically and printed.
+    python demo/demo_1_simulated_known_probe.py
+
+It downloads a small data file on first run and takes a few seconds on a GPU.  It prints the
+scan, the parameters, one line per iteration, and the error to the truth, and it writes
+figures to ``demo/output/demo_1_simulated_known_probe``.  If it runs, the installation is
+working.  The other demos are listed in :ref:`DemosDocs`.
+
+3. Reconstruct your own data
+----------------------------
+
+Put your data in two numpy arrays and three numbers:
+
+- ``frames``: a 3D array with shape ``(positions, size, size)``.  Each frame is a diffraction
+  pattern in detector counts, with the dark level subtracted, cropped to an even ``size``
+  with the beam at the center.
+- ``positions``: a 2D array with shape ``(positions, 2)``: the row and the column of the
+  center of the probe on the object at each frame, **in meters**.
+- The photon ``energy`` in keV (or the ``wavelength`` in meters), the ``detector_distance``
+  in meters from the object to the detector, and the ``detector_pixel`` pitch in meters.
+
+These go into a :class:`~xptycho.Scan`.  A :class:`~xptycho.PtychoModel` is built from the
+scan, and its :meth:`~xptycho.PtychoModel.recon` method does the reconstruction::
+
+    import xptycho
+
+    scan = xptycho.Scan(frames, positions, energy=8.8, detector_distance=2.0, detector_pixel=75e-6)
+    print(scan.summary())
+    scan.show()                                   # one frame and the map of positions
+
+    model = xptycho.PtychoModel.from_scan(scan)
+    model.print_params()                          # every parameter, its units, and its origin
+    recon = model.recon(scan, iterations=100)     # no probe given, so it is estimated
+
+    recon.show()                                  # the object, the probe, the data-error curve
+    recon.save('./output/my_scan')
+    image = recon.object                          # complex array; recon.pixel_size is in meters
+
+The object pixel size is not something you choose.  It follows from the instrument:
+wavelength times detector distance, divided by frame size times detector pixel.  Check it in
+the printed parameters; if it is wrong, one of the three numbers is wrong.
+
+The result is a :class:`~xptycho.Reconstruction`.  ``recon.object`` is the complex image,
+``recon.phase`` and ``recon.magnitude`` are its two parts, ``recon.probe`` holds the probe
+modes, and ``recon.curves['data_error']`` is the mismatch between the data and the forward
+model at each iteration.  ``recon.save`` writes a folder that
+:meth:`Reconstruction.load <xptycho.Reconstruction.load>` reads back.
+
+4. Adjust the reconstruction
+----------------------------
+
+**The probe.**  If you know the probe, pass it and it is held fixed::
+
+    recon = model.recon(scan, probe=my_probe, iterations=100)
+
+If you have a good guess, pass it as the starting point and it is refined::
+
+    recon = model.recon(scan, init_probe=my_guess, iterations=100)
+
+**The starting probe.**  With no probe given, the starting probe is computed from the
+data.  Setting ``initial_probe_distance`` propagates it that many meters, which gives it
+the curvature of a focused beam and usually helps::
+
+    model.set_params(initial_probe_distance=2e-6)
+
+**Several probe modes.**  A partially coherent beam needs more than one mode.  Say how many
+when you build the model, and at which iterations each extra mode is added::
+
+    model = xptycho.PtychoModel.from_scan(scan, probe_modes=2)
+    model.set_params(mode_schedule=[20], initial_probe_distance=2e-6)
+    recon = model.recon(scan, iterations=200)
+    print(recon.mode_energies)                    # the share of the energy in each mode
+
+**The data-fit weights.**  ``object_data_fit`` (default 0.6) sets how strongly each
+position pulls its patch toward its own frame.  Lower it for noisy data.
+``probe_data_fit`` does the same for the probe::
+
+    model.set_params(object_data_fit=0.5, probe_data_fit=0.6)
+
+**More iterations.**  Continue from a result instead of starting over::
+
+    recon = model.recon(scan, init=recon, iterations=100)
+
+**The scan positions.**  If the recorded positions may be off by a pixel or so, test it.
+:meth:`~xptycho.PtychoModel.refine_positions` tries shifted positions and reports how much
+each one would improve the fit.  It changes nothing until you accept the result::
+
+    new_positions, gain = model.refine_positions(scan, recon.object, recon.probe)
+    model.set_params(positions=new_positions)
+    recon = model.recon(scan, init=recon, iterations=100)
+
+**The devices.**  Without a call, every GPU on the node is used.  To choose::
+
+    model.configure_devices(num_devices=1)             # one GPU, for a run that repeats exactly
+    model.configure_devices(devices=['cpu'])           # no GPU
+
+The parameters are listed with :meth:`~xptycho.PtychoModel.print_params`, and every class and
+function is described in :ref:`UserAPIDocs`.

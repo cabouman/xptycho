@@ -69,7 +69,7 @@ Please cite the software itself when referencing this package.
 ```bibtex
 @misc{xptycho,
   title = {xptycho: Ptychographic Reconstruction with {PMACE} in {PyTorch}},
-  author = {Charles A. Bouman and Brendt Wohlberg},
+  author = {Charles A. Bouman and Brendt Wohlberg and Gregery T. Buzzard},
   howpublished = {Software library available from \url{https://github.com/cabouman/xptycho}},
   note = {Version 0.0.1},
   year = 2026

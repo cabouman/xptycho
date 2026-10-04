@@ -1,72 +1,97 @@
 xptycho: Ptychographic Reconstruction with PMACE
 =================================================
 
-**Reconstruct the complex image of an object from a ptychographic
-scan, on one GPU or many.**
+**xptycho** is a Python package that reconstructs the complex image of an
+object from a ptychographic scan.
 
-.. warning::
+**Key features:**
 
-   Under construction.  xptycho is being written.  The interface is
-   designed and documented, and the reconstruction code is being ported
-   from ptycho_pmace.  Nothing here runs yet.
+* Reconstructs the magnitude and phase of the object by projected
+  multi-agent consensus equilibrium (PMACE).
+* Estimates the probe when it is not known, with one or several probe modes.
+* Three objects and a few lines of Python: a scan, a model, a reconstruction.
+* Runs through PyTorch_ on a CPU, on one GPU, or divided among the GPUs of one node.
+* Reproduces the results of the PMACE papers, about 10 to 30 times faster
+  than the reference code on the same computer.
 
-A ptychographic scan records far-field diffraction patterns while a
-focused X-ray probe steps across a thin object in overlapping
-positions.  xptycho reconstructs the object's complex transmittance,
-magnitude and phase, from those patterns, and estimates the probe when
-it is not known.  The method is projected multi-agent consensus
-equilibrium (PMACE), which treats every scan position as an agent and
-finds the image on which all agents agree.
+.. grid:: 3
+   :margin: 0
+   :padding: 0
+   :gutter: 0
 
-.. plot:: figs/ptycho_geometry.py
-   :align: center
-   :width: 85%
+   .. grid-item-card:: Simple interface
+      :columns: 12 6 6 4
+      :class-card: sd-border-0
+      :shadow: None
 
-   A ptychographic scan.  The probe illuminates overlapping patches of
-   the object, and the detector records the far-field intensity of
-   each patch.
+      A reconstruction is a few lines: load a scan, build a model, call ``recon``.
 
-A reconstruction in one screen
-------------------------------
+   .. grid-item-card:: Known or unknown probe
+      :columns: 12 6 6 4
+      :class-card: sd-border-0
+      :shadow: None
 
-.. code-block:: python
+      Give the probe to hold it fixed, or leave it out and it is estimated with the object.
 
-   import xptycho
+   .. grid-item-card:: One GPU or several
+      :columns: 12 6 6 4
+      :class-card: sd-border-0
+      :shadow: None
 
-   scan = xptycho.Scan.load('scan.h5')          # frames, positions, instrument facts
-   model = xptycho.PtychoModel.from_scan(scan, probe_modes=2)
-   model.set_params(mode_schedule=[20], initial_probe_distance=2e-6)
-   recon = model.recon(scan, iterations=200)    # no probe given, so it is estimated
-   recon.show()
-   image = recon.object                         # complex, with recon.pixel_size
+      The same script runs on a laptop and on a multi-GPU node, with the same result.
 
-What xptycho gives you
-----------------------
+.. grid:: 3
 
-- **The complex object image** with its pixel size and origin, ready
-  for a 3-D laminography reconstruction in mbirtorch.
-- **The probe modes** with their energy fractions.
-- **A parameter table with provenance**: which values were given,
-  read from the file, derived, defaulted, or estimated.
-- **Scale**: a reconstruction runs on one GPU or divided among the
-  GPUs of one node, with the same result.
+   .. grid-item-card:: :octicon:`rocket;1.5em` Getting Started
+      :columns: 12 6 6 4
+      :link: overview
+      :link-type: doc
+
+      What xptycho does, and your first reconstruction.
+
+   .. grid-item-card:: :octicon:`book;1.5em` User Guide
+      :columns: 12 6 6 4
+      :link: install
+      :link-type: doc
+
+      Installation, the demos, and the interface.
+
+   .. grid-item-card:: :octicon:`tools;1.5em` Developer Docs
+      :columns: 12 6 6 4
+      :link: dev_design
+      :link-type: doc
+
+      How the package was designed, and how it is released.
+
+.. note::
+
+   xptycho is new.  Version 0.0.1 is not yet on PyPI, and the interface may still change.
+
+.. _PyTorch: https://pytorch.org
 
 .. toctree::
    :hidden:
    :maxdepth: 2
-   :caption: User Guide
+   :caption: Background
 
    overview
-   install
-   data
    quick_start
-   usr_api
    theory
    credits
 
 .. toctree::
    :hidden:
    :maxdepth: 2
+   :caption: User Guide
+
+   install
+   demos
+   usr_api
+
+.. toctree::
+   :hidden:
+   :maxdepth: 2
    :caption: Developer Guide
 
+   dev_design
    dev_release
