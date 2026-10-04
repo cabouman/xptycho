@@ -57,6 +57,15 @@ Development
 
 xptycho is developed by Charles A. Bouman, Brendt Wohlberg, and Gregery T. Buzzard.
 
+Support
+-------
+
+The development of this software was supported by:
+
+    * The U.S. Department of Energy through Los Alamos National Laboratory
+    * The Showalter Trust
+    * The National Science Foundation under Grant CCF-1763896
+
 Citation
 --------
 
