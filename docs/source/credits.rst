@@ -77,6 +77,6 @@ following when referencing this software.
     author = {Charles A. Bouman and Brendt Wohlberg and Gregery T. Buzzard},
     title = {{xptycho: Ptychographic Reconstruction with PMACE in PyTorch}},
     howpublished = {Software library available from \url{https://github.com/cabouman/xptycho}},
-    note = {Version 0.0.1},
+    note = {Version 0.1.0},
     year = 2026
     }

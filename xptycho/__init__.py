@@ -9,7 +9,7 @@ holds the parameters and the forward model, and
 probe.
 """
 
-__version__ = '0.0.1'
+__version__ = '0.1.0'
 
 from .scan import Scan, energy_to_wavelength
 from .model import PtychoModel
