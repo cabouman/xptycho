@@ -49,23 +49,26 @@ table.t td:first-child { font-family: var(--mono); font-size: 13px; white-space:
 <div class="wrap">
 <p class="crumb"><a href="index.html">xptycho design</a> &rsaquo; The user's view</p>
 <h1>The User's View</h1>
-<p class="lead">The scripts a user writes, one per use, and every public name in one place. The three objects are those of the <a href="objects.html">objects page</a>; the helper functions and the <code>Scan</code> methods are listed here for the first time. Written before the code, so that the code is written to match the scripts and not the other way around.</p>
+<p class="lead">The scripts a user writes, one per use, and every public name in one place. The three objects are those of the <a href="objects.html">objects page</a>; the helper functions and the <code>Scan</code> methods are listed here. The scripts follow the three demos in <code>demo/</code>.</p>
 
 <h2>1. The scripts</h2>
 
-<h3>Simulate and reconstruct with a known probe (demo 1, TCI 2023 Fig. 6)</h3>
+<h3>Simulate and reconstruct with a known probe (demo 1, TCI 2023)</h3>
 <pre>import xptycho as xpt
 
 TRUTH_URL = 'https://www.datadepot.rcac.purdue.edu/bouman/data/demo_xptycho_synthetic.h5'
 truth = xpt.Sample.load(xpt.download(TRUTH_URL, './demo/input'))   <span class="c"># a Sample: truth.object, truth.probe, truth.pixel_pitch</span>
-probe_positions = xpt.scan_positions(grid=(12, 12), step=1.02e-6, max_offset=0.3e-6, seed=0)
+pixel_pitch = truth.pixel_pitch
+probe_positions = xpt.scan_positions(grid=(12, 12), step=68 * pixel_pitch, max_offset=5 * pixel_pitch, seed=0)
+det_distance = pixel_pitch * 256 * 75e-6 / xpt.energy_to_wavelength(8.8)
 
-model = xpt.PtychoModel(energy=8.8, det_distance=2.0, det_pixel_pitch=75e-6,
-                        frame_size=256, probe_positions=positions, num_probe_modes=1)
-scan = model.simulate(truth, peak_photons=1e4, seed=0)
+model = xpt.PtychoModel(energy=8.8, det_distance=det_distance, det_pixel_pitch=75e-6,
+                        frame_size=256, probe_positions=probe_positions)
+model.set_params(object_shape=truth.object.shape)                    <span class="c"># the object grid of the truth</span>
+scan = model.simulate(truth, peak_photons=1e4, dark_rate=0.5, seed=0)
 print(scan.summary())
 
-model.set_params(object_data_fit=0.6, probe_weight_exponent=1.25, relaxation=0.5)
+model.set_params(object_data_fit=0.7, probe_weight_exponent=1.5, relaxation=0.5)
 model.print_params()
 recon = model.recon(scan, probe=truth.probe, iterations=100)
 print(recon.summary())
@@ -74,34 +77,60 @@ xpt.save_figures(figures, './output/demo_1')
 recon.save('./output/demo_1/recon.h5')</pre>
 <p class="note">The detector distance is chosen so the model's object pixel equals the truth's pixel pitch. <code>simulate</code> compares the sample's <code>pixel_pitch</code> with the model's and refuses a mismatch, naming both values.</p>
 
-<h3>Preprocess measured data, then reconstruct blind with two modes (demo 2, TCI 2025)</h3>
-<p class="note">Two scripts, because preprocessing is done once and reconstruction many times.</p>
-<pre><span class="c"># script one: raw file to scan file</span>
-path = xpt.fetch('goldballs_cxi')                                    <span class="c"># entry 65 of the CXI database, cxidb.org; downloaded once</span>
-scan = xpt.preprocess(path, dark='mean_of_dark_frames', crop=512, apodization='tukey',
-                      energy=1.0, det_distance=0.112)         <span class="c"># positions and detector pitch come from the file</span>
-print(scan.summary()); xpt.view_scan(scan)
-scan.save('goldballs.h5')
+<h3>Simulate and reconstruct blind with two modes (demo 2, TCI 2025)</h3>
+<pre>TRUTH_URL = 'https://www.datadepot.rcac.purdue.edu/bouman/data/demo_xptycho_blind.h5'
+truth = xpt.Sample.load(xpt.download(TRUTH_URL, './demo/input'))
+pixel_pitch = truth.pixel_pitch
+probe_positions = xpt.scan_positions(grid=(20, 20), step=36 * pixel_pitch, max_offset=5 * pixel_pitch, seed=0)
 
-<span class="c"># script two: reconstruct</span>
-scan = xpt.Scan.load('goldballs.h5')
-model = xpt.PtychoModel.from_scan(scan, num_probe_modes=2)
-model.set_params(object_data_fit=0.5, probe_data_fit=0.6, probe_weight_exponent=1.25,
-                 relaxation=0.5, mode_schedule=[20], probe_fresnel_radius_pixels=22)
+model = xpt.PtychoModel(wavelength=1.4e-9, det_distance=pixel_pitch * 256 * 75e-6 / 1.4e-9,
+                        det_pixel_pitch=75e-6, frame_size=256, probe_positions=probe_positions,
+                        num_probe_modes=2)
+model.set_params(object_shape=truth.object.shape)
+scan = model.simulate(truth, peak_photons=1e4, seed=0)
+
+model.set_params(object_data_fit=0.5, probe_data_fit=0.6, probe_weight_exponent=1.25, relaxation=0.5,
+                 mode_schedule=[20], mode_energy_fraction=0.1, probe_fresnel_radius_pixels=22.05)
 recon = model.recon(scan, iterations=200)                            <span class="c"># probe not given: estimated</span>
-xpt.view_sample(recon, region=VIEW_REGION); recon.save('./output/goldballs/recon.h5')</pre>
+figures = xpt.view_sample(recon, compare_to=truth)</pre>
+
+<h3>Preprocess measured data, then reconstruct blind with two modes (demo 3, TCI 2025)</h3>
+<pre>import xptycho.preprocess as xpp
+
+RAW_URL = 'https://cxidb.org/data/65/AuBalls_700ms_30nmStep_3_full.cxi'   <span class="c"># entry 65 of the CXI database, cxidb.org</span>
+raw = xpp.cxi.load_raw(xpt.download(RAW_URL, './demo/input'))       <span class="c"># counts, dark frames, translations, instrument facts</span>
+frames = xpp.subtract_dark(raw['frames'], raw['dark_frames'])
+outlier = xpp.find_outlier_frames(frames, 2.0)
+frames, translations = frames[~outlier], raw['translations'][~outlier]
+center = xpp.diffraction_center(frames)
+frames = xpp.crop_frames(frames, center, 512)
+frames = frames * xpp.tukey_window(512, 0.5) ** 2
+scan = xpt.Scan(frames, translations[:, [1, 0]], wavelength=raw['wavelength'],
+                det_distance=raw['det_distance'], det_pixel_pitch=raw['det_pixel_pitch'])
+print(scan.summary()); xpt.view_scan(scan)
+scan.save('goldballs.h5')                                            <span class="c"># optional: a later script can start from Scan.load</span>
+
+model = xpt.PtychoModel.from_scan(scan, num_probe_modes=2)
+model.set_params(object_data_fit=0.5, probe_data_fit=0.6, probe_weight_exponent=1.25, relaxation=0.5,
+                 mode_schedule=[10], mode_energy_fraction=0.05, orthogonalize_modes=True,
+                 probe_fresnel_radius_pixels=2.5)
+recon = model.recon(scan, iterations=100)                            <span class="c"># probe not given: estimated</span>
+xpt.view_sample(recon, region=(77, 477, 99, 499)); recon.save('./output/goldballs/recon.h5')</pre>
 
 <h3>Several GPUs</h3>
 <pre>model.configure_devices(num_devices=4)                               <span class="c"># default: every GPU present</span>
-recon = model.recon(scan, iterations=200)                            <span class="c"># the same call; the positions are divided among the GPUs</span></pre>
+recon = model.recon(scan, iterations=100)                            <span class="c"># the same call; the positions are divided among the GPUs</span></pre>
 
 <h3>Continue a finished run, and refine positions</h3>
 <pre>scan = xpt.Scan.load('goldballs.h5')
 model = xpt.PtychoModel.from_scan(scan, num_probe_modes=2)
+model.set_params(object_data_fit=0.5, probe_data_fit=0.6, probe_fresnel_radius_pixels=2.5)
 recon = xpt.Sample.load('./output/goldballs/recon.h5')
+model.set_params(object_shape=recon.object.shape, object_origin=recon.origin)   <span class="c"># keep the object grid of the first run</span>
 new_pos, misfit = model.refine_probe_positions(scan, recon.object, recon.probe, max_shift=1)
 model.set_params(probe_positions=new_pos)
 recon = model.recon(scan, init=recon, iterations=100)</pre>
+<p class="note">The object grid is set from the first result. Otherwise it is derived from the positions, new positions can change its shape, and <code>recon</code> refuses <code>init=recon</code>.</p>
 
 <h3>The forward model alone</h3>
 <pre>amplitudes = model.forward(recon.object, recon.probe)                <span class="c"># (J, Np, Np), no noise</span>
@@ -111,16 +140,19 @@ print(model.data_error(scan, recon.object, recon.probe))</pre>
 <div class="frame">
 <table class="t">
   <tr><th>name</th><th>what it is</th></tr>
-  <tr><td>Scan</td><td>the measurement: frames, recorded positions, instrument facts. <code>Scan.load(path)</code>, <code>scan.save(path)</code>, <code>scan.summary()</code>, <code>scan.probe_positions</code>, <code>scan.num_frames</code>, <code>scan.frame_shape</code></td></tr>
+  <tr><td>Scan(frames, probe_positions, *, wavelength or energy, det_distance, det_pixel_pitch, name)</td><td>the measurement: frames (intensities), recorded positions, instrument facts. <code>Scan.load(path)</code>, <code>scan.save(path)</code>, <code>scan.summary()</code>, <code>scan.amplitudes()</code>, <code>scan.frames</code>, <code>scan.probe_positions</code>, <code>scan.wavelength</code>, <code>scan.det_distance</code>, <code>scan.det_pixel_pitch</code>, <code>scan.name</code>, <code>scan.num_frames</code>, <code>scan.frame_size</code></td></tr>
   <tr><td>PtychoModel</td><td>the parameters and the forward model; the <a href="objects.html">objects page</a>, section 2, lists every method</td></tr>
-  <tr><td>Sample</td><td>an object and the probe it was seen with; a ground truth or what <code>recon</code> returns: <code>object</code>, <code>probe</code>, <code>pixel_pitch</code>, <code>origin</code>, <code>name</code>, <code>mode_energies</code>, and <code>run</code> for an estimate (<code>run.parameters</code>, <code>run.data_error</code>, <code>run.iterations</code>, <code>run.probe_positions</code>, <code>run.coverage</code>); <code>summary()</code>, <code>save(path)</code>, <code>Sample.load(path)</code></td></tr>
+  <tr><td>Sample</td><td>an object and the probe it was seen with; a ground truth or what <code>recon</code> returns: <code>object</code>, <code>probe</code>, <code>pixel_pitch</code>, <code>origin</code>, <code>name</code>, <code>mode_energies</code>, <code>phase</code>, <code>magnitude</code>, and <code>run</code> for a reconstruction (<code>run.parameters</code>, <code>run.data_error</code>, <code>run.iterations</code>, <code>run.probe_positions</code>, <code>run.coverage</code>); <code>scanned_region()</code>, the rectangle spanned by the probe centers, for a reconstruction; <code>summary()</code>, <code>save(path)</code>, <code>Sample.load(path)</code></td></tr>
+  <tr><td>RunRecord</td><td>the class of <code>run</code>, the record of a reconstruction</td></tr>
   <tr><td>view_scan(scan), view_sample(sample, region, compare_to, compare_label)</td><td>viewing, separate from the objects: each makes figures, puts them on the screen, and returns them. <code>region</code> is the part of the object to show, chosen in the script; with none given, the rectangle spanned by the probe centers. The windows zoom and pan with the mouse.</td></tr>
   <tr><td>save_figures(figures, directory)</td><td>write the figures a view returned to PNG files</td></tr>
   <tr><td>download(url, directory)</td><td>download a file into a directory unless it is already there; returns the local path</td></tr>
   <tr><td>scan_positions(grid, step, max_offset, seed)</td><td>positions of a rectangular scan with random offsets, in meters</td></tr>
-  <tr><td>fetch(name)</td><td>download a named public dataset once; returns the local path of the raw file</td></tr>
-  <tr><td>preprocess(path, dark, crop, apodization, **facts)</td><td>a raw file to a <code>Scan</code>. <code>dark</code> is a dark frame array, or <code>'mean_of_dark_frames'</code> to average the dark frames the file holds. <code>crop</code> is the frame size kept about the beam center. <code>apodization='tukey'</code> multiplies each frame by a Tukey window (flat in the middle, tapering to zero at the edge). Instrument facts the file lacks are given as keywords.</td></tr>
+  <tr><td>preprocess</td><td>the module of preprocessing steps, each a function of arrays in memory: <code>cxi.load_raw(path)</code>, <code>subtract_dark</code>, <code>find_outlier_frames</code>, <code>diffraction_center</code>, <code>crop_frames</code>, <code>tukey_window</code>; see the <a href="preprocessing.html">preprocessing page</a></td></tr>
   <tr><td>nrmse(image, truth, region=None)</td><td>error after removing one complex scale; with a region (for example <code>recon.scanned_region()</code>) only the pixels inside it count</td></tr>
+  <tr><td>match_scale(image, truth, region=None)</td><td><code>image</code> times the one complex number that brings it closest to <code>truth</code></td></tr>
+  <tr><td>energy_to_wavelength(energy)</td><td>photon energy in keV to wavelength in meters</td></tr>
+  <tr><td>operators</td><td>the building blocks of the forward model: the centered Fourier transform, cutting patches out of an image, adding patches into an image, the stable division</td></tr>
 </table>
 </div>
 
@@ -128,31 +160,27 @@ print(model.data_error(scan, recon.object, recon.probe))</pre>
 <div class="frame">
 <table class="t">
   <tr><th>name</th><th>kind</th><th>meaning</th></tr>
-  <tr><td>energy / wavelength</td><td><span class="kind k-fm">fmodel</span></td><td>keV, or meters</td></tr>
-  <tr><td>det_distance</td><td><span class="kind k-fm">fmodel</span></td><td>meters, object to detector</td></tr>
-  <tr><td>det_pixel_pitch</td><td><span class="kind k-fm">fmodel</span></td><td>meters, after any binning</td></tr>
-  <tr><td>frame_size</td><td><span class="kind k-fm">fmodel</span></td><td>\(N_p\), detector pixels per side</td></tr>
-  <tr><td>probe_positions</td><td><span class="kind k-fm">fmodel</span></td><td>(J, 2), row then column, meters; settable, for refinement</td></tr>
-  <tr><td>num_probe_modes</td><td><span class="kind k-fm">fmodel</span></td><td>\(K\)</td></tr>
-  <tr><td>object_data_fit, probe_data_fit</td><td><span class="kind k-par">recon</span></td><td>\(\alpha_1\), \(\alpha_2\); defaults 0.6, 0.6</td></tr>
-  <tr><td>probe_weight_exponent</td><td><span class="kind k-par">recon</span></td><td>\(\kappa\); default 1.25</td></tr>
-  <tr><td>relaxation</td><td><span class="kind k-par">recon</span></td><td>\(\rho\); default 0.5</td></tr>
-  <tr><td>mode_schedule</td><td><span class="kind k-par">recon</span></td><td>iterations at which a mode is added; default none</td></tr>
-  <tr><td>mode_energy_fraction</td><td><span class="kind k-par">recon</span></td><td>\(f\); default 0.05</td></tr>
-  <tr><td>orthogonalize_modes</td><td><span class="kind k-par">recon</span></td><td>make the modes orthogonal each time a mode is added; default off</td></tr>
-  <tr><td>probe_fresnel_radius_pixels</td><td><span class="kind k-par">recon</span></td><td>The radius, in pixels, over which Fresnel propagation spreads each point of the initial probe and of a new mode; default 0 (no propagation)</td></tr>
-  <tr><td>num_devices, devices</td><td><span class="kind k-comp">compute_params</span></td><td>arguments of <code>configure_devices</code>: how many GPUs, or which; see <a href="computing.html">Computing</a>, section 4</td></tr>
+  <tr><td>energy / wavelength</td><td><span class="kind k-fm">forward model</span></td><td>keV, or meters</td></tr>
+  <tr><td>det_distance</td><td><span class="kind k-fm">forward model</span></td><td>meters, object to detector</td></tr>
+  <tr><td>det_pixel_pitch</td><td><span class="kind k-fm">forward model</span></td><td>meters, after any binning</td></tr>
+  <tr><td>frame_size</td><td><span class="kind k-fm">forward model</span></td><td>\(N_p\), detector pixels per side</td></tr>
+  <tr><td>probe_positions</td><td><span class="kind k-fm">forward model</span></td><td>(J, 2), row then column, meters; settable, for refinement</td></tr>
+  <tr><td>num_probe_modes</td><td><span class="kind k-fm">forward model</span></td><td>\(K\); default 1</td></tr>
+  <tr><td>object_data_fit, probe_data_fit</td><td><span class="kind k-par">reconstruction</span></td><td>\(\alpha_1\), \(\alpha_2\); defaults 0.6, 0.6</td></tr>
+  <tr><td>probe_weight_exponent</td><td><span class="kind k-par">reconstruction</span></td><td>\(\kappa\); default 1.25</td></tr>
+  <tr><td>relaxation</td><td><span class="kind k-par">reconstruction</span></td><td>\(\rho\); default 0.5</td></tr>
+  <tr><td>mode_schedule</td><td><span class="kind k-par">reconstruction</span></td><td>iterations at which a mode is added; default none</td></tr>
+  <tr><td>mode_energy_fraction</td><td><span class="kind k-par">reconstruction</span></td><td>\(f\); default 0.05</td></tr>
+  <tr><td>orthogonalize_modes</td><td><span class="kind k-par">reconstruction</span></td><td>make the modes orthogonal each time a mode is added; default off</td></tr>
+  <tr><td>probe_fresnel_radius_pixels</td><td><span class="kind k-par">reconstruction</span></td><td>The radius, in pixels, over which Fresnel propagation spreads each point of the initial probe and of a new mode; default 0 (no propagation)</td></tr>
+  <tr><td>object_shape</td><td><span class="kind k-par">reconstruction</span></td><td>rows and columns of the object grid; default: the smallest grid that holds every patch</td></tr>
+  <tr><td>object_origin</td><td><span class="kind k-par">reconstruction</span></td><td>meters, the position of the center of the first pixel of the object grid; default: from the positions</td></tr>
+  <tr><td>num_devices, devices</td><td><span class="kind k-comp">device</span></td><td>arguments of <code>configure_devices</code>: how many GPUs, or which; see <a href="computing.html">Computing</a>, section 4</td></tr>
+  <tr><td>batch_size</td><td><span class="kind k-comp">device</span></td><td>positions processed together on a device; set with <code>set_params</code>; default: from the free memory</td></tr>
 </table>
 </div>
-<p class="note">Arguments of <code>recon</code>, not parameters: <code>probe</code>, <code>init_probe</code>, <code>init</code>, <code>iterations</code>.</p>
+<p class="note">Arguments of <code>recon</code>, not parameters: <code>probe</code>, <code>init_probe</code>, <code>init</code>, <code>iterations</code> (default 100), <code>verbose</code> (default 1, one line per iteration; 0 prints nothing).</p>
 
-<h2>3. Open points</h2>
-<div class="ask">
-  <ol>
-    <li><b>Laminography series.</b> One model per scan (positions differ per tilt), with the series handled by a loop in the user's script, or one object holding all of them. Claude's view: one model per scan in version 1; a series object only if the loop proves awkward.</li>
-    <li><b>Units of <code>energy</code>:</b> keV, as in the papers and the old configs.</li>
-  </ol>
-</div>
 </div>
 <script>
 window.MathJax = { tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] }, svg: { fontCache: 'global' } };

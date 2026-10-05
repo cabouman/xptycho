@@ -82,28 +82,28 @@ table.params th { font-size: 12px; letter-spacing: 0.06em; text-transform: upper
 <div class="wrap">
 <p class="crumb"><a href="index.html">xptycho design</a> &rsaquo; Theory</p>
 <h1>PMACE Algorithm Structure</h1>
-<p class="lead">The PMACE algorithm, organized by the kinds of quantities it uses, before any code. The derivation is in the two TCI papers (2023, known probe; 2025, blind multi-mode); the algorithm as run is Qiuchen Zhai's <code>ptycho_pmace</code>, which fills in what the papers leave out, and this page follows the code wherever the two differ and says so. The 2023 case is \(K=1\) with the probe held fixed, so this is one algorithm.</p>
+<p class="lead">The PMACE algorithm as xptycho runs it (<code>xptycho/pmace.py</code> and <code>xptycho/model.py</code>), organized by the kinds of quantities it uses. The derivation is in the two TCI papers (2023, known probe; 2025, blind multi-mode). The method was first implemented in Qiuchen Zhai's research code <code>ptycho_pmace</code>, which fills in details the papers leave out; xptycho does the same, and this page says where it differs from the papers. The 2023 case is \(K=1\) with the probe held fixed, so this is one algorithm.</p>
 
 <h2>1. The quantities</h2>
-<p>There are five kinds. They differ in who sets them and how long they live. The names <code>fmodel_params</code> and <code>recon_params</code> are the mbirtorch split: the first specifies the forward model, the second specifies the reconstruction.</p>
+<p>There are five kinds. They differ in who sets them and how long they live. The two kinds of parameters follow the split used in mbirtorch: the forward-model parameters specify the forward model, and the reconstruction parameters specify the reconstruction.</p>
 <div class="grid">
   <div class="card k-data">
     <h3>Measured data</h3>
     <div class="when">Fixed for the whole run. Never modified.</div>
     <ul>
-      <li>\(y_j\), one per scan position \(j = 0,\dots,J-1\): the measured amplitude, an \(N_p \times N_p\) real array. It is the square root of the detector counts. (Dark subtraction and bad-pixel masking are preprocessing; the papers do not discuss them.)</li>
+      <li>\(y_j\), one per scan position \(j = 0,\dots,J-1\): the measured amplitude, an \(N_p \times N_p\) real array. It is the square root of the detector counts. (Dark subtraction is preprocessing; the papers do not discuss it.)</li>
     </ul>
     <p style="margin:8px 0 0;font-size:14px">The data file also records the scan positions and the instrument facts. Those are forward-model parameters that happen to be read from the file.</p>
   </div>
   <div class="card k-fm">
-    <h3>Forward-model parameters (<code>fmodel_params</code>)</h3>
-    <div class="when">Specify the forward model \(A\). Read from the data file or given. Never estimated in version 1.</div>
+    <h3>Forward-model parameters</h3>
+    <div class="when">Specify the forward model \(A\). Read from the data file or given. Not estimated by the reconstruction; the positions can be replaced by refined ones (<code>refine_probe_positions</code>, then <code>set_params(probe_positions=...)</code>).</div>
     <ul>
       <li>Wavelength (or energy), object-to-detector distance, detector pixel pitch, frame size \(N_p\).</li>
       <li>The scan positions, in meters.</li>
-      <li>\(K\), the number of probe modes the model ends with: not a physical fact, but part of the assumed model. A blind run starts with one mode and reaches \(K\) on the mode schedule.</li>
+      <li>\(K\), the number of probe modes the model ends with: not a physical fact, but part of the assumed model. A blind run starts with one mode, or with the modes of a given starting probe, and reaches \(K\) on the mode schedule.</li>
     </ul>
-    <p style="margin:8px 0 0;font-size:14px">From these the model derives the object pixel pitch, \(\lambda L / (N_p \Delta_{\mathrm{det}})\) with \(L\) the detector distance (standard far-field sampling; not stated in the papers), the positions in pixels, and so the patch operators \(P_j\). Far-field propagation is a fixed assumption of the model, not a parameter.</p>
+    <p style="margin:8px 0 0;font-size:14px">From these the model derives the object pixel pitch, \(\lambda L / (N_p \Delta_{\mathrm{det}})\) with \(L\) the detector distance (standard far-field sampling; not stated in the papers), the positions in pixels, and so, with the object grid (a reconstruction parameter), the patch operators \(P_j\). Far-field propagation is a fixed assumption of the model, not a parameter.</p>
   </div>
   <div class="card k-unk">
     <h3>Unknowns</h3>
@@ -115,17 +115,17 @@ table.params th { font-size: 12px; letter-spacing: 0.06em; text-transform: upper
     <p style="margin:8px 0 0;font-size:14px">In the equations \(D_k = \mathrm{diag}(d_k)\) is multiplication by probe mode \(k\). It is the unknown written as a matrix, not an operator of the instrument.</p>
   </div>
   <div class="card k-par">
-    <h3>Reconstruction parameters (<code>recon_params</code>)</h3>
+    <h3>Reconstruction parameters</h3>
     <div class="when">Chosen by the user. Specify the reconstruction, not the physics.</div>
     <ul>
       <li>\(\alpha_1\): object data-fit weight. \(\alpha_2\): probe data-fit weight.</li>
       <li>\(\kappa \in [1,2]\): exponent on \(|d_k|\) in the averaging weights.</li>
       <li>\(\rho \in (0,1)\): the Mann step.</li>
-      <li>The number of iterations.</li>
+      <li>The number of iterations. It is an argument of <code>recon</code>, default 100, not a parameter set with <code>set_params</code>.</li>
       <li>The mode schedule: the iterations at which a new mode is added, and the energy fraction \(f\) a new mode gets (section 5).</li>
       <li>The Fresnel radius used to initialize the probe and to add a mode (sections 4 and 5).</li>
-      <li>The object grid: its shape, which must hold every patch. The counterpart of <code>recon_shape</code> in mbirtorch.</li>
-      <li>(\(\varepsilon\) in a stable inverse is a fixed formula, \(10^{-6}\sqrt{\|a\|^2/\dim a}\) for the array \(a\) being inverted, not a choice.)</li>
+      <li>The object grid: its shape and the position of its first pixel (<code>object_shape</code>, <code>object_origin</code>). It must hold every patch. By default it is the smallest grid that does. The counterpart of <code>recon_shape</code> in mbirtorch.</li>
+      <li>(\(\varepsilon\) in a stable inverse is a fixed formula, \(10^{-6}\sqrt{\|a\|^2/\dim a}\) for the array \(a\) being inverted, not a choice. For the division by the patches, \(a\) is all \(J\) patches together, so one \(\varepsilon\) serves every position.)</li>
     </ul>
   </div>
   <div class="card k-state wide">
@@ -134,21 +134,21 @@ table.params th { font-size: 12px; letter-spacing: 0.06em; text-transform: upper
     <ul>
       <li>\(\mathbf{v} = [v_0,\dots,v_{J-1}]\): one complex \(N_p \times N_p\) patch per scan position, each position's own copy of its part of the object. The same size as the data.</li>
       <li>When the probe is estimated: \(\mathbf{s}_k = [d_{0,k},\dots,d_{J-1,k}]\), each position's own copy of mode \(k\). Also the size of the data, once per mode.</li>
-      <li>The other Mann variables: \(\mathbf{w}, \mathbf{z}\) (patches) and \(\mathbf{r}_k, \mathbf{u}_k\) (probes). Not all are temporary: \(\mathbf{z}\) is used by the probe step of the same iteration, and \(\mathbf{u}_k\) is the probe the next iteration's image step uses.</li>
+      <li>The other Mann variables: \(\mathbf{w}, \mathbf{z}\) (patches) and \(\mathbf{r}_k, \mathbf{u}_k\) (probes). They are temporary. xptycho never stores \(\mathbf{w}\), \(\mathbf{z}\), or \(\mathbf{r}_k\) for all positions at once: each is formed for one batch of positions and used at once (<a href="computing.html">computing page</a>, section 2).</li>
     </ul>
-    <p style="margin:8px 0 0;font-size:14px">PMACE is a consensus method: every scan position holds its own copy of what it can see, and the unknowns are the consensus of the copies. Neither unknown is state. At the end, \(\hat x\) is the weighted average of the \(v_j\) and \(\hat d_k\) is the mean of the \(d_{j,k}\). Inside the loop the unknowns themselves never appear: the consensus values the steps use are \(\mathbf{z}\) (patches of the average of \(2\mathbf{w}-\mathbf{v}\)) and \(\mathbf{u}_k\), which equal the unknowns only at the fixed point.</p>
+    <p style="margin:8px 0 0;font-size:14px">PMACE is a consensus method: every scan position holds its own copy of what it can see, and the unknowns are the consensus of the copies. Neither unknown is state. At the end, \(\hat x\) is the weighted average of the \(v_j\) and \(\hat d_k\) is the mean of the \(d_{j,k}\). Inside the loop the steps use consensus values. The object step uses \(\mathbf{z}\) (patches of the average of \(2\mathbf{w}-\mathbf{v}\)) and the modes \(d_k\). The probe step uses the patches \(p_j = P_j \bar x\) of the reported image and the modes \(d_k\). The modes \(d_k\) are the mean of the copies \(\mathbf{s}_k\) after their Mann update.</p>
   </div>
 </div>
-<p style="margin-top:12px">Not on this page: compute settings (devices, batch size). They change where the arithmetic runs and never the answer. They would be a sixth kind, <code>compute_params</code>, kept separate as mbirtorch keeps them.</p>
+<p style="margin-top:12px">Not on this page: the device settings. These are the devices, chosen with <code>configure_devices</code>, and the batch size, the parameter <code>batch_size</code> set with <code>set_params</code>. They change where the arithmetic runs, and change the result only by rounding.</p>
 
 <h2>2. The forward model and the operators</h2>
 <p>The forward model is a function of the unknowns, specified by the forward-model parameters:</p>
 \[ y_j = \sqrt{\mathrm{Pois}\Big(\sum_{k=0}^{K-1} \big|\mathcal{F} D_k P_j x\big|^2\Big)} \]
-<p>Here \(P_j\) cuts patch \(j\) out of the object (from the positions and the pixel pitch), \(D_k = \mathrm{diag}(d_k)\) multiplies by probe mode \(k\), and \(\mathcal{F}\) is the orthonormal 2D DFT, the far-field propagation to the detector. The modes add in intensity, and the detector counts \(I_j = y_j^2\) are Poisson. Everything the algorithm does is built from these pieces and the four steps below.</p>
+<p>Here \(P_j\) cuts patch \(j\) out of the object (from the positions, the pixel pitch, and the object grid), \(D_k = \mathrm{diag}(d_k)\) multiplies by probe mode \(k\), and \(\mathcal{F}\) is the orthonormal 2D DFT, the far-field propagation to the detector. The modes add in intensity, and the detector counts \(I_j = y_j^2\) are Poisson. Everything the algorithm does is built from these pieces and the four steps below.</p>
 <div class="ops">
   <div class="op"><b>Building blocks</b>
     \(P_j^T\) adds a patch back into the image at position \(j\); \(\mathcal{F}^*\) is the inverse DFT.
-    A stable inverse of any array \(a\) is \(a^* / (|a|^2 + \varepsilon)\) with \(\varepsilon = 10^{-6}\sqrt{\|a\|^2/\dim a}\); it is written \(D_{k,\varepsilon}^{-1}\), \(X_{j,\varepsilon}^{-1}\), \(\Lambda_{k,\varepsilon}^{-1}\) below.
+    A stable inverse of any array \(a\) is \(a^* / (|a|^2 + \varepsilon)\) with \(\varepsilon = 10^{-6}\sqrt{\|a\|^2/\dim a}\); it is written \(D_{k,\varepsilon}^{-1}\), \(X_{j,\varepsilon}^{-1}\), \(\Lambda_{k,\varepsilon}^{-1}\) below. For \(X_{j,\varepsilon}^{-1}\), \(a\) is all \(J\) patches together, so one \(\varepsilon\) serves every position.
     \(\Lambda_k = \sum_j P_j^T |D_k|^\kappa P_j\): the coverage map, an image-sized diagonal.
     \(w_k = \|d_k\|^2 / \sum_m \|d_m\|^2\): the energy weight of mode \(k\).
     In a blind run \(\Lambda_k\) and \(w_k\) are computed from the current consensus modes and change every iteration.
@@ -163,7 +163,7 @@ table.params th { font-size: 12px; letter-spacing: 0.06em; text-transform: upper
     \[\bar x(\mathbf{v}) = \sum_k w_k\, \Lambda_{k,\varepsilon}^{-1} \sum_j P_j^T |D_k|^\kappa v_j, \qquad (\mathbf{G}^I \mathbf{v})_j = P_j\, \bar x(\mathbf{v})\]
   </div>
   <div class="op"><b>Probe data-fit step \(F^P_{j,k}\)</b>
-    <span class="uses">uses the patch \(p_j = P_j \bar x\) of the current average image, \(y_j\), this position's own copy \(d_{j,k}\) for the phase, and the consensus modes \(d_m\) for the amplitude. (The papers write the denominator with the per-position copies and pass \(\mathbf{z}\) for the patch; the code does as written here.)</span>
+    <span class="uses">uses the patch \(p_j = P_j \bar x\) of the current average image, \(y_j\), this position's own copy \(d_{j,k}\) for the phase, and the consensus modes \(d_m\) for the amplitude. (The papers write the denominator with the per-position copies and pass \(\mathbf{z}\) for the patch; xptycho does as written here.)</span>
     \[\tilde d_{j,k} = X_{j,\varepsilon}^{-1}\,\mathcal{F}^*\!\left( y_j \circ \frac{|\mathcal{F} X_j d_k|}{\sqrt{\sum_m |\mathcal{F} X_j d_m|^2}} \circ \frac{\mathcal{F} X_j d_{j,k}}{|\mathcal{F} X_j d_{j,k}|} \right), \quad X_j = \mathrm{diag}(p_j), \qquad
       F^P_{j,k}(d_{j,k}) = (1-\alpha_2)\, d_{j,k} + \alpha_2\, \tilde d_{j,k}\]
   </div>
@@ -172,24 +172,25 @@ table.params th { font-size: 12px; letter-spacing: 0.06em; text-transform: upper
     \[\bar d_k = \frac{1}{J} \sum_j d_{j,k}\]
   </div>
   <div class="op"><b>Outlier replacement</b>
-    <span class="uses">after each mode's Mann update, per pixel: copies far from the mean are replaced by it; a mean deviation of zero is replaced by \(10^{-6}\) (<code>process_probe_arr</code>; not in the papers)</span>
+    <span class="uses">after the Mann update of the copies, per pixel and per mode: copies far from the mean are replaced by it; a mean deviation of zero is replaced by \(10^{-6}\) (in <code>Run.update_probe</code>; not in the papers)</span>
     \[ d_k \leftarrow \tfrac{1}{J}\textstyle\sum_j s_{j,k}, \qquad s_{j,k} \leftarrow d_k \ \text{ wherever } \ 0.6745\,\frac{|s_{j,k} - d_k|}{\mathrm{mean}_j |s_{j,k} - d_k|} > 1.5 \]
   </div>
 </div>
 
 <h2>3. One iteration</h2>
-<p>As implemented in <code>ptycho_pmace</code>, which is Algorithm 1 of the 2025 paper with the probe step taking its patches from the average of the updated \(\mathbf{v}\). Each line is tagged <span class="tag l">local</span> when every position is handled on its own, or <span class="tag g">global</span> when it needs a sum over all positions.</p>
+<p>As implemented in xptycho (<code>Run.update_object</code>, <code>Run.add_mode</code>, <code>Run.update_probe</code>, called by <code>PtychoModel.recon</code>). xptycho implements the algorithms of the two papers. Each line is tagged <span class="tag l">local</span> when every position is handled on its own, or <span class="tag g">global</span> when it needs a sum over all positions.</p>
 <div class="algo">
   <div class="row"><span class="tag l">local</span><span>w ← F<sup>I</sup>(v; d)</span><span class="cm">each position fits its own data, using the consensus modes d<sub>k</sub></span></div>
   <div class="row"><span class="tag g">global</span><span>z ← G<sup>I</sup>(2w − v)</span><span class="cm">one scatter-add over all j, divide by Λ, one gather</span></div>
   <div class="row"><span class="tag l">local</span><span>v ← v + 2ρ (z − w)</span><span class="cm">Mann update</span></div>
   <div class="row"><span class="tag g">global</span><span>x̄ ← x̄(v);&nbsp; p<sub>j</sub> ← P<sub>j</sub> x̄</span><span class="cm">the image this iteration reports; its patches feed the probe step</span></div>
-  <div class="row"><span class="tag" style="visibility:hidden">x</span><span>if this iteration is in the mode schedule: add a mode</span><span class="cm">section 5; blind case only</span></div>
-  <div class="row"><span class="tag" style="visibility:hidden">x</span><span>for each mode k = 0 … K−1, in order:</span><span class="cm">blind case only</span></div>
-  <div class="row ind"><span class="tag l">local</span><span>r<sub>k</sub> ← F<sup>P</sup><sub>k</sub>(s<sub>k</sub>; p, d)</span><span class="cm">each position refines its own copy of mode k</span></div>
-  <div class="row ind"><span class="tag g">global</span><span>u<sub>k</sub> ← G<sup>P</sup>(2r<sub>k</sub> − s<sub>k</sub>)</span><span class="cm">one mean over all j</span></div>
+  <div class="row"><span class="tag" style="visibility:hidden">x</span><span>if this iteration is in the mode schedule: add a mode, then make the modes orthogonal if <code>orthogonalize_modes</code></span><span class="cm">section 5; blind case only</span></div>
+  <div class="row"><span class="tag" style="visibility:hidden">x</span><span>for all modes k = 0 … K−1 at once, using the modes d as they stand before this pass:</span><span class="cm">blind case only</span></div>
+  <div class="row ind"><span class="tag l">local</span><span>r<sub>k</sub> ← F<sup>P</sup><sub>k</sub>(s<sub>k</sub>; p, d)</span><span class="cm">each position refines its own copy of every mode</span></div>
+  <div class="row ind"><span class="tag g">global</span><span>u<sub>k</sub> ← G<sup>P</sup>(2r<sub>k</sub> − s<sub>k</sub>)</span><span class="cm">one mean over all j, for every mode</span></div>
   <div class="row ind"><span class="tag l">local</span><span>s<sub>k</sub> ← s<sub>k</sub> + 2ρ (u<sub>k</sub> − r<sub>k</sub>)</span><span class="cm">Mann update</span></div>
   <div class="row ind"><span class="tag g">global</span><span>d<sub>k</sub> ← mean of s<sub>k</sub>;&nbsp; replace outlying copies by d<sub>k</sub></span><span class="cm">the mean and the deviation statistic are sums over j; the replacement is per position</span></div>
+  <div class="row"><span class="tag g">global</span><span>data error of x̄ and d</span><span class="cm">for the progress line and the convergence record</span></div>
   <div class="row" style="margin-top:8px"><span class="tag" style="visibility:hidden">x</span><span>output: x̂ = x̄;&nbsp; d̂<sub>k</sub> = d<sub>k</sub></span></div>
 </div>
 
@@ -201,56 +202,60 @@ table.params th { font-size: 12px; letter-spacing: 0.06em; text-transform: upper
   <div class="arrow">&rarr;</div>
   <div class="step sl"><b>local</b>each position updates its own state row</div>
 </div>
-<p>Once per iteration for the patches, plus one averaging of the updated patches, and once more per mode for the probes when the probe is estimated. That is the entire communication pattern.</p>
+<p>Once per iteration for the patches, plus one averaging of the updated patches, and once more for the probes, all modes together, when the probe is estimated. That is the entire communication pattern.</p>
 
 <h2>4. Initialization</h2>
-<p>As the code does it (<code>gen_init_probe</code>, <code>gen_init_obj</code>). The probe first, from the mean back-transformed data, propagated a chosen distance \(z\) by Fresnel propagation \(U\) at the wavelength \(\lambda\) and the object pixel pitch \(\Delta_x\), then smoothed by a Gaussian low-pass filter \(S\) with \(\sigma = 1\) pixel on the real and imaginary parts. This is the only place Fresnel propagation appears; the forward model is far-field throughout, and \(z\) is a reconstruction parameter.</p>
-\[ d^{(0)} = S\left\{ U_{\lambda,z,\Delta_x}\left\{ \frac{1}{J}\sum_j \mathcal{F}^* y_j \right\} \right\} \]
-<p>Then the object, real-valued, so that each patch has the right scale: a constant patch of value \(\sqrt{\|y_j\| / \|d^{(0)}\|}\) per position, averaged over the coverage, pixels no patch reaches set to the median, then the same filter on the magnitude.</p>
+<p>As xptycho does it (<code>PtychoModel.initial_probe</code>, <code>PtychoModel.initial_object</code>). <code>recon</code> uses these formulas only for what is not given. A known probe (<code>probe=</code>) or a starting probe (<code>init_probe=</code>) is used in place of \(d^{(0)}\). A <code>Sample</code> given as <code>init=</code> supplies the starting object, and the starting probe when none is given otherwise.</p>
+<p>The probe first, from the mean back-transformed data, Fresnel propagated by \(U_r\), then smoothed by a Gaussian low-pass filter \(S\) with \(\sigma = 1\) pixel on the real and imaginary parts. \(U_r\) is Fresnel propagation with radius \(r\) = <code>probe_fresnel_radius_pixels</code> \(= \sqrt{\lambda z}/\Delta_x\): the radius, in pixels, over which propagation by a distance \(z\) spreads each point of the field, with \(\lambda\) the wavelength and \(\Delta_x\) the object pixel pitch. \(r = 0\) means no propagation, and is the default. Fresnel propagation appears only here and in adding a mode (section 5); the forward model is far-field throughout.</p>
+\[ d^{(0)} = S\left\{ U_r\left\{ \frac{1}{J}\sum_j \mathcal{F}^* y_j \right\} \right\} \]
+<p>Then the object, real-valued, so that each patch has the right scale: a constant patch of value \(\sqrt{\|y_j\| / \|d^{(0)}\|}\) per position, averaged over the coverage, pixels no patch reaches set to the median, then the same filter on the magnitude. Here \(d^{(0)}\) is the probe the run starts with, all its modes: the formula above, the known probe, or the given starting probe.</p>
 \[ x^{(0)} = S\left\{ \left| \Lambda_{0,\varepsilon}^{-1} \sum_j P_j^T \left( \sqrt{\frac{\|y_j\|}{\|d^{(0)}\|}}\; \mathbf{1} \right) \right| \right\}, \qquad \Lambda_0 = \sum_j P_j^T P_j \]
-<p>The run state starts as copies: \(v_j^{(0)} = P_j x^{(0)}\), with \(\mathbf{w} = \mathbf{z} = \mathbf{v}\), and \(\mathbf{r}_0 = \mathbf{s}_0 = \mathbf{u}_0\) all \(J\) copies of \(d^{(0)}\). A blind run starts with one mode.</p>
+<p>The run state starts as copies: \(v_j^{(0)} = P_j x^{(0)}\), and, when the probe is estimated, \(s_{j,k} = d^{(0)}_k\) for every position and mode. A blind run starts with one mode, or with the modes of the given starting probe.</p>
 
 <h2>5. Adding probe modes</h2>
-<p>A blind run reaches \(K\) modes by adding one at each iteration of the mode schedule (a reconstruction parameter; the 2025 paper's two-mode runs add the second mode at iteration 20). The addition happens after the image pass of that iteration and before its probe pass, as the code does (<code>add_probe_mode</code>). With \(E = \sum_k \|d_k\|^2\) the total probe energy before the addition and \(f = 0.05\) the energy fraction of a new mode:</p>
+<p>A blind run reaches \(K\) modes by adding one at each iteration of the mode schedule (<code>mode_schedule</code>; demo 2 adds the second mode at iteration 20, demo 3 at iteration 10). The addition happens after the image pass of that iteration and before its probe pass (<code>Run.add_mode</code>). With \(E = \sum_k \|d_k\|^2\) the total probe energy before the addition and \(f\) the energy fraction of a new mode (<code>mode_energy_fraction</code>, default 0.05):</p>
 <ol class="facts">
   <li><b>Residual intensity</b>, per position, from the consensus modes and the patches of the current average image, clipped at zero:
-    \[ I^{\mathrm{res}}_j = \max\!\Big(0,\; I_j - \sum_{k<K} |\mathcal{F} D_k p_j|^2\Big), \qquad p_j = P_j \bar x \]</li>
+    \[ I^{\mathrm{res}}_j = \max\!\Big(0,\; I_j - \sum_{k&lt;K} |\mathcal{F} D_k p_j|^2\Big), \qquad p_j = P_j \bar x \]</li>
   <li><b>The new mode</b>: back-transform the residual amplitude, divide by the patch, average over positions, Fresnel propagate as in the initialization:
-    \[ d_K = U_{\lambda,z,\Delta_x}\left\{ \frac{1}{J} \sum_j X_{j,\varepsilon}^{-1}\, \mathcal{F}^* \sqrt{I^{\mathrm{res}}_j} \right\}, \qquad X_j = \mathrm{diag}(p_j) \]</li>
+    \[ d_K = U_r\left\{ \frac{1}{J} \sum_j X_{j,\varepsilon}^{-1}\, \mathcal{F}^* \sqrt{I^{\mathrm{res}}_j} \right\}, \qquad X_j = \mathrm{diag}(p_j) \]</li>
   <li><b>Scale it</b> to the fraction \(f\) of the total energy: \(d_K \leftarrow d_K \cdot \sqrt{f E} / \|d_K\|\).</li>
   <li><b>Its per-position copies</b> \(\mathbf{s}_K\) are \(J\) identical copies of \(d_K\).</li>
   <li><b>Rescale everything</b>: every mode \(d_k\) and every copy \(s_{j,k}\), \(k = 0 \ldots K\), is divided by \(\sqrt{1+f}\), so the total energy is \(E\) again.</li>
   <li>\(K \leftarrow K+1\). The energy weights \(w_k\) follow from the new modes.</li>
 </ol>
-<p><b>Orthogonal modes, optional</b> (<code>orthogonalize_modes</code>, off by default; <code>orthogonalize_images</code> in the code). Right after the addition, the modes are replaced by an orthogonal set. With the modes as the columns of a matrix \(D = [d_0 \cdots d_{K-1}]\) and its singular value decomposition \(D = U S V^H\), the new modes are the columns of \(U S\), in order of decreasing energy, and every per-position copy \(s_{j,k}\) is set to the new \(d_k\). Since \(U S = D V\) with \(V\) unitary, the new modes predict the same intensities \(\sum_k |\mathcal{F} D_k p_j|^2\) as the old ones. The 2025 paper's software uses this step in the two-mode reconstruction of the gold-ball data and not in the synthetic experiments.</p>
+<p><b>Orthogonal modes, optional</b> (<code>orthogonalize_modes</code>, off by default; <code>Run.orthogonalize_modes</code>). Right after the addition, the modes are replaced by an orthogonal set. With the modes as the columns of a matrix \(D = [d_0 \cdots d_{K-1}]\) and its singular value decomposition \(D = U S V^H\), the new modes are the columns of \(U S\), in order of decreasing energy, and every per-position copy \(s_{j,k}\) is set to the new \(d_k\). Since \(U S = D V\) with \(V\) unitary, the new modes predict the same intensities \(\sum_k |\mathcal{F} D_k p_j|^2\) as the old ones. Demo 3, the two-mode reconstruction of the gold-ball data, uses this step; demo 2 does not.</p>
 
 <h2>6. The facts that matter for code</h2>
 <ol class="facts">
-  <li><b>Every pass is local, global, local.</b> The local steps need only their own \(y_j\), their own state row, and the current consensus. The global step is one sum over \(j\). This is what lets the data stream through in batches and across GPUs without changing the answer, provided the order within an iteration (the image pass, the averaging, then each mode's pass in turn) is kept.</li>
-  <li><b>The state is as large as the data, times \((1+K)\), and the peak is higher.</b> As the algorithm is written, \(\mathbf{v}\), \(\mathbf{w}\), \(\mathbf{z}\) are alive together, and so are \(\mathbf{s}_k\) and \(\mathbf{r}_k\) for each mode. The old code keeps all of it in memory at once. For integrated-circuit scans that is what does not fit, so where the per-position state lives is the first design question, not an afterthought.</li>
+  <li><b>Every pass is local, global, local.</b> The local steps need only their own \(y_j\), their own state row, and the current consensus. The global step is one sum over \(j\). This is what lets the data stream through in batches and across GPUs without changing the answer, provided the order within an iteration (the image pass, the averaging, then the probe pass) is kept.</li>
+  <li><b>The state is as large as the data, times \((1+K)\).</b> xptycho stores \(\mathbf{v}\) and, when the probe is estimated, \(\mathbf{s}_k\) for every position. It does not store \(\mathbf{w}\), \(\mathbf{z}\), or \(\mathbf{r}_k\) for all positions: each is formed for one batch of positions and used at once. Where the per-position state is kept, and how large a scan fits, is the subject of the <a href="computing.html">computing page</a>.</li>
   <li><b>The averaging step is scatter-add, divide by coverage, gather.</b> Nothing else touches the whole image. \(\Lambda_k\) is itself a scatter-add of \(|d_k|^\kappa\), recomputed every iteration in a blind run. The iteration does this averaging twice: once on \(2\mathbf{w}-\mathbf{v}\) for the Mann step, once on the updated \(\mathbf{v}\) for the reported image and the probe step.</li>
-  <li><b>The probe pass has two global reductions per mode:</b> the mean of the copies, and the per-pixel deviation statistic for outlier replacement, which needs the mean first. Mode addition is one more: the mean of the back-transformed residuals.</li>
-  <li><b>The forward model is fixed by the forward-model parameters alone.</b> \(P_j\) comes from the positions and the pixel pitch; \(\mathcal{F}\) is the far-field assumption. The unknowns \(x\) and \(d_k\) are its inputs. Everything else in the algorithm is arithmetic on patches.</li>
+  <li><b>The probe pass has four global reductions, each over all modes at once:</b> the \(\varepsilon\) of the division by the patches, the mean of \(2\mathbf{r}_k - \mathbf{s}_k\), the mean of the updated copies, and the per-pixel deviation statistic for outlier replacement, which needs the mean first. Mode addition has two: the \(\varepsilon\) of the division by the patches and the mean of the back-transformed residuals.</li>
+  <li><b>The forward model is fixed by the forward-model parameters and the object grid.</b> \(P_j\) comes from the positions, the pixel pitch, and the object grid (<code>object_shape</code>, <code>object_origin</code>); \(\mathcal{F}\) is the far-field assumption. The unknowns \(x\) and \(d_k\) are its inputs. Everything else in the algorithm is arithmetic on patches.</li>
 </ol>
 
 <h2>7. Parameter names in the API</h2>
 <table class="params">
-  <tr><th>API name</th><th>symbol</th><th>meaning</th></tr>
-  <tr><td><code>object_data_fit</code></td><td>\(\alpha_1\)</td><td>weight of the data-fitting step in the object update</td></tr>
-  <tr><td><code>probe_data_fit</code></td><td>\(\alpha_2\)</td><td>weight of the data-fitting step in the probe update</td></tr>
-  <tr><td><code>probe_weight_exponent</code></td><td>\(\kappa\)</td><td>exponent on the probe magnitude in the averaging weights</td></tr>
-  <tr><td><code>relaxation</code></td><td>\(\rho\)</td><td>Mann step</td></tr>
-  <tr><td><code>mode_schedule</code></td><td></td><td>the iterations at which a mode is added (section 5)</td></tr>
-  <tr><td><code>probe_fresnel_radius_pixels</code></td><td>\(\sqrt{\lambda z}/\Delta_x\)</td><td>The radius, in pixels, over which the Fresnel propagation of distance \(z\) spreads each point of the field, in the probe initialization and in adding a mode (sections 4 and 5); 0 means no propagation</td></tr>
-  <tr><td><code>num_probe_modes</code></td><td>\(K\)</td><td>number of probe modes (a forward-model parameter; the rest of this table are reconstruction parameters)</td></tr>
-  <tr><td><code>mode_energy_fraction</code></td><td>\(f\)</td><td>fraction of the probe energy given to a newly added mode (section 5; 0.05)</td></tr>
-  <tr><td><code>orthogonalize_modes</code></td><td></td><td>make the modes orthogonal each time a mode is added (section 5; off)</td></tr>
+  <tr><th>API name</th><th>symbol</th><th>default</th><th>meaning</th></tr>
+  <tr><td><code>object_data_fit</code></td><td>\(\alpha_1\)</td><td>0.6</td><td>weight of the data-fitting step in the object update</td></tr>
+  <tr><td><code>probe_data_fit</code></td><td>\(\alpha_2\)</td><td>0.6</td><td>weight of the data-fitting step in the probe update</td></tr>
+  <tr><td><code>probe_weight_exponent</code></td><td>\(\kappa\)</td><td>1.25</td><td>exponent on the probe magnitude in the averaging weights</td></tr>
+  <tr><td><code>relaxation</code></td><td>\(\rho\)</td><td>0.5</td><td>Mann step</td></tr>
+  <tr><td><code>mode_schedule</code></td><td></td><td>none</td><td>the iterations at which a mode is added (section 5)</td></tr>
+  <tr><td><code>mode_energy_fraction</code></td><td>\(f\)</td><td>0.05</td><td>fraction of the probe energy given to a newly added mode (section 5)</td></tr>
+  <tr><td><code>orthogonalize_modes</code></td><td></td><td>off</td><td>make the modes orthogonal each time a mode is added (section 5)</td></tr>
+  <tr><td><code>probe_fresnel_radius_pixels</code></td><td>\(r = \sqrt{\lambda z}/\Delta_x\)</td><td>0</td><td>The radius, in pixels, over which the Fresnel propagation of distance \(z\) spreads each point of the field, in the probe initialization and in adding a mode (sections 4 and 5); 0 means no propagation</td></tr>
+  <tr><td><code>object_shape</code></td><td>\(N_1 \times N_2\)</td><td>from the positions</td><td>rows and columns of the object grid; by default the smallest grid that holds every patch</td></tr>
+  <tr><td><code>object_origin</code></td><td></td><td>from the positions</td><td>meters, the position of the center of the first pixel of the object grid</td></tr>
+  <tr><td><code>batch_size</code></td><td></td><td>from the free memory</td><td>positions processed together on a device; a device setting that changes the result only by rounding</td></tr>
+  <tr><td><code>num_probe_modes</code></td><td>\(K\)</td><td>1</td><td>number of probe modes; a forward-model parameter, given to the constructor or to <code>from_scan</code>. The rest of this table are reconstruction parameters, set with <code>set_params</code>.</td></tr>
 </table>
-<p>The 2025 paper's values: \(\rho = 0.5\), \(\kappa = 1.25\), \(\alpha_2 = 0.6\), and \(\alpha_1 = 0.6\) with one mode or \(0.5\) with two. These names are the current proposal and may change with the design.</p>
+<p>The defaults are the 2025 paper's values for one mode. With two modes the paper uses \(\alpha_1 = 0.5\).</p>
 
-<h2>8. Where this stands</h2>
+<h2>8. Summary</h2>
 <div class="ask">
-  <p><b>Settled on 2026-10-03:</b> the five kinds above, with \(K\) a forward-model parameter. The measured data stands alone and is never modified. The run state is internal to the reconstruction and the user never sees it. The probe is an unknown, not part of the physics. The forward model is far-field only; Fresnel propagation appears only in the probe initialization and in adding a mode. Where the papers are silent or differ from the code, the algorithm is the code, as documented in sections 2 to 5; each such point may be revisited after the number-for-number match with the old code, and measured.</p>
+  <p>The five kinds above, with \(K\) a forward-model parameter. The measured data stands alone and is never modified. The run state is internal to the reconstruction and the user never sees it. The probe is an unknown, not part of the physics. The forward model is far-field only; Fresnel propagation appears only in the probe initialization and in adding a mode. Where the papers are silent or differ from xptycho, sections 2 to 5 state what xptycho does.</p>
   <p style="margin:0">Which objects hold the parameters and the unknowns is the <a href="objects.html">objects and data</a> page.</p>
 </div>
 </div>

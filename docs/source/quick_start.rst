@@ -104,9 +104,12 @@ position pulls its patch toward its own frame.  Lower it for noisy data.
 
 **The scan positions.**  If the recorded positions may be off by a pixel or so, test it.
 :meth:`~xptycho.PtychoModel.refine_probe_positions` tries shifted positions and reports how much
-each one would improve the fit.  It changes nothing until you accept the result::
+each one would improve the fit.  It changes nothing until you accept the result.  Position
+refinement is experimental.  Fix the object grid before setting the new positions, so that the
+earlier result still fits it::
 
     new_positions, gain = model.refine_probe_positions(scan, recon.object, recon.probe)
+    model.set_params(object_shape=recon.object.shape, object_origin=recon.origin)
     model.set_params(probe_positions=new_positions)
     recon = model.recon(scan, init=recon, iterations=100)
 

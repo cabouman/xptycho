@@ -44,28 +44,28 @@ ul.refs li { margin: 4px 0; }
 <body>
 <div class="wrap">
 <h1>xptycho Design</h1>
-<p class="lead">The design of xptycho, a PyTorch implementation of PMACE ptychography. One page per component, written to be read by a person before any code is written. Start at the top and read down.</p>
+<p class="lead">The design of xptycho, a PyTorch implementation of PMACE ptychography. One page per component; each describes the design the code implements. Start at the top and read down.</p>
 
 <div class="list">
   <div class="item">
     <h3><a href="theory.html">1. Theory</a></h3>
     <span class="status done">written</span>
-    <p>The PMACE algorithm of the two TCI papers, as derived in the two TCI papers and as run in Qiuchen Zhai's <code>ptycho_pmace</code>, organized by the five kinds of quantities it uses (measured data, forward-model parameters, unknowns, reconstruction parameters, run state); the forward model and the operators; one iteration with each step marked local or global; initialization; adding probe modes; the facts that matter for code; and the parameter names.</p>
+    <p>The PMACE algorithm of the two TCI papers, as xptycho runs it, organized by the five kinds of quantities it uses (measured data, forward-model parameters, unknowns, reconstruction parameters, run state); the forward model and the operators; one iteration with each step marked local or global; initialization; adding probe modes; the facts that matter for code; and the parameter names.</p>
   </div>
   <div class="item">
     <h3><a href="objects.html">2. Objects and data</a></h3>
-    <span class="status done">layout chosen</span>
-    <p>The mbirtorch pattern, chosen 2026-10-03: a <code>Scan</code> holds the data, a <code>PtychoModel</code> holds the forward-model, reconstruction, and compute parameters and computes <code>forward</code>, <code>simulate</code>, and <code>recon</code>; a <code>Sample</code> holds the unknowns, an object and its probe, whether true or estimated. The model drawn in full with every method, the <code>Sample</code> and the record of its run, the HDF5 file format, the two directions through the model, the scripts, position refinement as a method, and two open points.</p>
+    <span class="status done">written</span>
+    <p>The mbirtorch pattern: a <code>Scan</code> holds the data, a <code>PtychoModel</code> holds the forward-model parameters, the reconstruction parameters, and the device settings and computes <code>forward</code>, <code>simulate</code>, and <code>recon</code>; a <code>Sample</code> holds the unknowns, an object and its probe, whether true or estimated. The model drawn in full with every method, the <code>Sample</code> and the record of its run, the HDF5 file format, the two directions through the model, the scripts, and position refinement as a method.</p>
   </div>
   <div class="item">
     <h3><a href="computing.html">3. Computing</a></h3>
-    <span class="status done">decided</span>
+    <span class="status done">written</span>
     <p>The design for carrying out the iteration on \(N_g\) GPUs of one node, all data in GPU memory, fully sharded as in mbirtorch: per-position arrays by position, the object image by row into bands with owners, small arrays broadcast. What each GPU holds and how large a scan fits; what each GPU computes and what moves between GPUs in every step; what crosses between host and GPU; how the user chooses the GPUs.</p>
   </div>
   <div class="item">
     <h3><a href="users-view.html">4. The user's view</a></h3>
-    <span class="status todo">draft</span>
-    <p>The scripts a user writes, one per use: the two demos, a cluster run that resumes, continuing and refining, the forward model alone. Every public name and every parameter by kind in one place. Three open points.</p>
+    <span class="status done">written</span>
+    <p>The scripts a user writes, one per use: the three demos, several GPUs, continuing and refining, the forward model alone. Every public name and every parameter by kind in one place.</p>
   </div>
   <div class="item">
     <h3><a href="preprocessing.html">5. Preprocessing</a></h3>
@@ -78,6 +78,8 @@ ul.refs li { margin: 4px 0; }
 <ul class="refs">
   <li>Q. Zhai, G. T. Buzzard, K. Mertes, B. Wohlberg, C. A. Bouman, "Projected Multi-Agent Consensus Equilibrium (PMACE) with Application to Ptychography," <i>IEEE Trans. Computational Imaging</i>, 2023. <a href="https://doi.org/10.1109/TCI.2023.3328288">doi:10.1109/TCI.2023.3328288</a></li>
   <li>Q. Zhai, G. T. Buzzard, K. Mertes, B. Wohlberg, C. A. Bouman, "Ptychography using Blind Multi-Mode PMACE," <i>IEEE Trans. Computational Imaging</i>, 2025. <a href="https://doi.org/10.1109/TCI.2025.3609957">doi:10.1109/TCI.2025.3609957</a></li>
+  <li>Q. Zhai, G. T. Buzzard, K. Mertes, B. Wohlberg, C. A. Bouman, "Blind Multi-Mode Ptychography Using a Distributed Probe Estimate," <i>IEEE International Conference on Image Processing (ICIP)</i>, pp. 1115-1120, 2025. <a href="https://doi.org/10.1109/ICIP55913.2025.11084669">doi:10.1109/ICIP55913.2025.11084669</a></li>
+  <li>Q. Zhai, B. Wohlberg, G. T. Buzzard, C. A. Bouman, "Projected Multi-Agent Consensus Equilibrium for Ptychographic Image Reconstruction," <i>55th Asilomar Conference on Signals, Systems, and Computers</i>, pp. 1694-1698, 2021. <a href="https://doi.org/10.1109/IEEECONF53345.2021.9723357">doi:10.1109/IEEECONF53345.2021.9723357</a></li>
 </ul>
 </div>
 <script>window.MathJax = { tex: { inlineMath: [['\\(', '\\)']] }, svg: { fontCache: 'global' } };</script>

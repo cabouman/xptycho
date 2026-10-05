@@ -76,7 +76,7 @@ li { margin: 4px 0; }
     <li>What does each GPU compute, what moves between GPUs, and is the result the same as with one GPU?</li>
     <li>What crosses between the host and the GPUs, and when?</li>
     <li>What does the user set, and what is refused?</li>
-    <li>How closely does the result agree with the old code, and with itself on different devices?</li>
+    <li>How closely does the result agree with the research code <code>ptycho_pmace</code>, and with itself on different devices?</li>
   </ol>
 </div>
 
@@ -92,11 +92,11 @@ li { margin: 4px 0; }
   <tr><td>\(v_j\)</td><td>the position's copy of its object patch</td><td>\(8 N_p^2\) per position</td></tr>
   <tr><td>\(s_{j,k}\)</td><td>the position's copy of each probe mode; only when the probe is estimated</td><td>\(8 K N_p^2\) per position</td></tr>
   <tr class="sep"><td>\(\bar x\), the image sums, \(\Lambda_k\)</td><td>the object image, the sums over positions that build it, the coverage maps</td><td>a few times \(8N\) in total</td><td><b>sharded by image row.</b> Each GPU owns one <b>band</b> of rows, and also holds its <b>window</b>.</td></tr>
-  <tr class="sep"><td>\(d_k\), \(u_k\), the deviation, the position list</td><td>the probe modes and the other probe-sized arrays; the scan positions</td><td>small</td><td><b>broadcast.</b></td></tr>
+  <tr class="sep"><td>\(d_k\), \(u_k\), the deviation</td><td>the probe modes and the other probe-sized arrays</td><td>small</td><td><b>broadcast.</b></td></tr>
 </table>
 </div>
 <div class="defs">
-  <b>block</b><span>The positions are sorted by the first row of their patch and cut into \(N_g\) blocks of nearly equal count. GPU \(g\) holds block \(g\).</span>
+  <b>block</b><span>The positions are sorted by the first row of their patch and cut into \(N_g\) blocks of nearly equal count. GPU \(g\) holds block \(g\), with the patch positions of that block.</span>
   <b>band</b><span>The rows of the object image are cut into \(N_g\) bands of nearly equal height. GPU \(g\) owns band \(g\): it holds the one finished value of every pixel in it.</span>
   <b>window</b><span>The range of image rows that the patches of a GPU's block touch. A GPU adds its patches into its window and cuts its patches from its window. A window usually reaches past the GPU's own band into its neighbors'.</span>
 </div>
@@ -108,18 +108,18 @@ li { margin: 4px 0; }
     <rect x="70" y="34" width="250" height="68" fill="var(--unk-bg)" stroke="var(--unk)" stroke-width="1.5"/>
     <text x="195" y="72" text-anchor="middle">band 0: rows 0–18</text>
     <rect x="70" y="102" width="250" height="68" fill="var(--par-bg)" stroke="var(--par)" stroke-width="1.5"/>
-    <text x="195" y="140" text-anchor="middle">band 1: rows 19–37</text>
+    <text x="195" y="140" text-anchor="middle">band 1: rows 19–36</text>
     <rect x="70" y="170" width="250" height="64" fill="var(--state-bg)" stroke="var(--state)" stroke-width="1.5"/>
-    <text x="195" y="206" text-anchor="middle">band 2: rows 38–55</text>
+    <text x="195" y="206" text-anchor="middle">band 2: rows 37–55</text>
     <rect x="360" y="34" width="26" height="86" fill="var(--unk)" opacity="0.6"/>
     <rect x="394" y="91" width="26" height="86" fill="var(--par)" opacity="0.6"/>
     <rect x="428" y="148" width="26" height="86" fill="var(--state)" opacity="0.6"/>
     <text x="480" y="62">window of GPU 0: rows 0–23</text>
     <text class="mut" x="480" y="79" font-size="12">its band, and rows 19–23 of band 1</text>
     <text x="480" y="128">window of GPU 1: rows 16–39</text>
-    <text class="mut" x="480" y="145" font-size="12">rows 16–18 of band 0, its band, and rows 38–39 of band 2</text>
+    <text class="mut" x="480" y="145" font-size="12">rows 16–18 of band 0, its band, and rows 37–39 of band 2</text>
     <text x="480" y="196">window of GPU 2: rows 32–55</text>
-    <text class="mut" x="480" y="213" font-size="12">rows 32–37 of band 1, and its band</text>
+    <text class="mut" x="480" y="213" font-size="12">rows 32–36 of band 1, and its band</text>
   </g>
 </svg>
 </div>
@@ -132,7 +132,7 @@ li { margin: 4px 0; }
   <tr><td>estimated probe, 2 modes</td><td>\(28 N_p^2\)</td><td class="n">38,000</td><td class="n">9,500</td></tr>
 </table>
 </div>
-<p>With \(N_g\) GPUs the capacity is \(N_g\) times these. The gold balls (794 positions, \(N_p = 512\), 2 modes) need 6 GB and fit on one GPU. Before anything is allocated, the memory each GPU needs, for the final number of modes, is compared with what that GPU has free; a run that does not fit is refused with the shortfall named.</p>
+<p>With \(N_g\) GPUs the capacity is \(N_g\) times these. The gold balls (794 positions, \(N_p = 512\), 2 modes) need 6 GB and fit on one GPU.</p>
 
 <h2>2. One iteration on \(N_g\) GPUs</h2>
 <div class="sgoal"><b>Goal</b>Say what each GPU computes over its own positions and what moves between GPUs in each step; then say why the result matches one GPU.</div>
@@ -163,7 +163,7 @@ li { margin: 4px 0; }
   <tr><th>number</th><th>used in</th><th>how it is formed</th></tr>
   <tr><td>\(\varepsilon\) of the division by \(\Lambda_k\)</td><td>steps 0, 1, 2</td><td>each owner adds \(|\Lambda_k|^2\) over its band; the sums are added and divided by \(N\), so every pixel of the grid is counted once</td></tr>
   <tr><td>\(\varepsilon\) of the division by the patch</td><td>steps 3, 4</td><td>each GPU adds \(\|p_j\|^2\) over its positions, \(p_j\) the patch of \(\bar x\); the sums are added and divided by \(J N_p^2\); one number per iteration</td></tr>
-  <tr><td>every mean over positions (\(d^{(0)}\), a new mode, \(u_k\), \(d_k\), the deviation)</td><td>steps 0, 3, 4, 5, 6</td><td>the GPUs' sums are added and divided by \(J\); never an average of the GPUs' own means</td></tr>
+  <tr><td>every mean over positions (a new mode, \(u_k\), \(d_k\), the deviation)</td><td>steps 3, 4, 5, 6</td><td>the GPUs' sums are added and divided by \(J\); never an average of the GPUs' own means</td></tr>
   </table>
 </div>
 
@@ -174,12 +174,13 @@ li { margin: 4px 0; }
 <div class="frame">
 <table class="t">
   <tr><th>when</th><th>direction</th><th>what</th><th>gold balls</th></tr>
-  <tr><td>once, at the start</td><td>host to GPU</td><td>the amplitudes of each GPU's block; the position list; the starting probe, to every GPU; the starting object, each band to its owner</td><td class="n">0.8 GB</td></tr>
+  <tr><td>once, at the start</td><td>host to GPU</td><td>the amplitudes of each GPU's block, and the patch positions of that block; the starting probe, to every GPU; the starting object, each band to its owner</td><td class="n">0.8 GB</td></tr>
   <tr><td>each iteration</td><td>GPU to host</td><td>a few numbers for the progress line</td><td class="n">bytes</td></tr>
-  <tr><td>once, at the end</td><td>GPU to host</td><td>the bands of \(\bar x\) and of the coverage, joined into one image; \(d_k\); any per-position output, put back in scan order</td><td class="n">about 10 MB</td></tr>
+  <tr><td>each iteration of the mode schedule</td><td>GPU to host, and back</td><td>the mean of the back-transformed residuals, which the host Fresnel propagates with numpy and returns as the new mode; with <code>orthogonalize_modes</code>, the modes, for the singular value decomposition on the host</td><td class="n">a few MB</td></tr>
+  <tr><td>once, at the end</td><td>GPU to host</td><td>the bands of \(\bar x\) and of the coverage, joined into one image; \(d_k\)</td><td class="n">about 10 MB</td></tr>
 </table>
 </div>
-<p>The starting probe and object, when not given, are computed on the host from the frames, with numpy, before anything goes to the GPUs. Nothing in the iteration waits on the host except the data error for the progress line.</p>
+<p>The starting probe and object, when not given, are computed on the host CPU from the frames before anything goes to the GPUs. In the iteration, the GPUs wait on the host only for the data error of the progress line and, at an iteration of the mode schedule, for the new mode and the orthogonalization.</p>
 
 <h2>4. What the user sets, and what is refused</h2>
 <div class="sgoal"><b>Goal</b>Say how the user chooses the GPUs, and name the cases <code>recon</code> refuses before it starts.</div>
@@ -189,7 +190,7 @@ li { margin: 4px 0; }
   <tr><th>call</th><th>what it does</th></tr>
   <tr><td>no call</td><td>The model chooses automatically: every CUDA GPU on the node; if there is none, Apple's GPU (mps); if there is none, the CPU. The choice is printed.</td></tr>
   <tr><td><code>model.configure_devices(num_devices=4)</code></td><td>Use 4 CUDA GPUs. \(N_g = 4\).</td></tr>
-  <tr><td><code>model.configure_devices(num_devices=1)</code></td><td>Use one device. This is the way to pin a run to one GPU so that it repeats exactly.</td></tr>
+  <tr><td><code>model.configure_devices(num_devices=1)</code></td><td>Use one device.</td></tr>
   <tr><td><code>model.configure_devices(devices=['cuda:0', 'cuda:2'])</code></td><td>Use exactly these devices. <code>devices=['cpu']</code> runs on the CPU; a list of several CPU devices is how the tests exercise \(N_g &gt; 1\) on a machine with no GPU.</td></tr>
 </table>
 </div>
@@ -197,14 +198,14 @@ li { margin: 4px 0; }
   <li>The call is made before <code>recon</code>. Once made, the automatic choice is off for that model.</li>
   <li>The result can differ in its last digits with the number of devices (section 2), so a run to be compared with another should pin its devices.</li>
   <li>The batch size is not set here. It is chosen automatically; a model parameter overrides it.</li>
-  <li>Refused, with the reason named: more devices than positions; more devices asked for than the node has; an odd \(N_p\) (the old code cannot run it, so there is nothing to match); a patch that reaches outside the object grid; a run that does not fit in the devices' free memory.</li>
+  <li>Refused, with the reason named: more devices than positions; more devices than object rows; more CUDA GPUs asked for than the node has; an odd \(N_p\); a patch that reaches outside the object grid.</li>
 </ul>
 <h2>5. Measured agreement</h2>
-<div class="sgoal"><b>Goal</b>Say how closely the new code agrees with the old code, and with itself on different devices.</div>
-<p>Measured on 2026-10-03 with <code>dev_scripts/baseline/compare_baseline.py</code> and the test suite. Differences are relative, on the object image, after removing one complex scale.</p>
+<div class="sgoal"><b>Goal</b>Say how closely xptycho agrees with <code>ptycho_pmace</code>, and with itself on different devices.</div>
+<p>Measured with <code>dev_scripts/baseline/compare_baseline.py</code> and the test suite. Differences are relative, on the object image, after removing one complex scale.</p>
 <div class="frame">
 <table class="t">
-  <tr><th>case</th><th>new code against old code</th><th>new code, one device against several</th></tr>
+  <tr><th>case</th><th>xptycho against <code>ptycho_pmace</code></th><th>xptycho, one device against several</th></tr>
   <tr><td>tiny problem, no noise, known probe, 20 iterations</td><td class="n">\(6 \times 10^{-7}\)</td><td class="n">\(6 \times 10^{-7}\) (2, 3, 5 devices)</td></tr>
   <tr><td>tiny problem, no noise, two modes estimated, 6 iterations</td><td class="n">within \(10^{-3}\) (test tolerance)</td><td class="n">within \(10^{-3}\) (3 devices)</td></tr>
   <tr><td>gold balls, known probe, 100 iterations</td><td class="n">\(2 \times 10^{-5}\); data error equal to 6 digits</td><td></td></tr>
@@ -213,7 +214,7 @@ li { margin: 4px 0; }
   <tr><td>blind, one mode, 200 iterations</td><td class="n">data error equal to 7 digits for 3 iterations, then to about \(10^{-3}\); error to the truth 0.0494 against 0.0497</td><td></td></tr>
 </table>
 </div>
-<p>On noisy data the object image is sensitive to rounding: two runs that differ only in the order of additions drift apart by about \(10^{-3}\) over 100 iterations, while the data error and the error to the truth stay fixed to five digits. When the probe is estimated, the outlier test is a threshold, so a last-bit difference can change which probe copies are replaced. The new code differs from the old code by no more than it differs from itself on another device.</p>
+<p>On noisy data the object image is sensitive to rounding: two runs that differ only in the order of additions drift apart by about \(10^{-3}\) over 100 iterations, while the data error and the error to the truth stay fixed to five digits. When the probe is estimated, the outlier test is a threshold, so a last-bit difference can change which probe copies are replaced. xptycho differs from <code>ptycho_pmace</code> by no more than it differs from itself on another device.</p>
 
 </div>
 <script>

@@ -70,7 +70,7 @@ frames = xpp.crop_frames(frames, center, 512)
 
 frames = frames * xpp.tukey_window(512, 0.5) ** 2              <span class="c"># 4. taper; the window multiplies amplitudes</span>
 
-probe_positions = -translations[:, [1, 0]]                           <span class="c"># rows along -y, columns along -x on this instrument</span>
+probe_positions = translations[:, [1, 0]]                            <span class="c"># as recorded: rows along y, columns along x</span>
 scan = xpt.Scan(frames, probe_positions, wavelength=raw['wavelength'],
                 det_distance=raw['det_distance'], det_pixel_pitch=raw['det_pixel_pitch'])</pre>
 <p class="note">Every intermediate is an array the user can look at. No step reads or writes a file except <code>load_raw</code> and <code>download</code>.</p>
@@ -107,9 +107,9 @@ scan = xpt.Scan(frames, probe_positions, wavelength=raw['wavelength'],
   <ol>
     <li><b>The definition of the center.</b> The center of mass of the mean frame reproduces the hand-chosen crop on this data. It is one center for all frames. A center per frame would be wrong: the center of mass of a single frame moves with the phase gradient of the object under the probe, so centering each frame would remove real signal. The fractional part of the center (0.37 and 0.18 pixel here) is dropped by the whole-pixel crop.</li>
     <li><b>What a common miscentering does.</b> A crop that is off by the same amount in every frame still fits the data exactly. With a known probe the object acquires a linear phase ramp of \(2\pi a / N_p\) radians per pixel for an offset of \(a\) pixels; with an estimated probe the ramp is shared between object and probe. Derived twice independently, not yet confirmed numerically.</li>
-    <li><b>Positions.</b> The reference data carries positions that were refined with another program and rounded to whole pixels; they differ from the recorded ones by up to 3 pixels. The script above uses the recorded positions, with rows along \(-y\) and columns along \(-x\). That orientation was found by fitting the reference positions to the recorded ones; it is a fact about this instrument and so is written in the script, not in the reader.</li>
+    <li><b>Positions.</b> The reference data carries positions that were refined with another program and rounded to whole pixels; they differ from the recorded ones by up to 3 pixels. The script above uses the recorded positions as recorded, with rows along \(y\) and columns along \(x\); the object then has the orientation of the SEM image supplied with the data set. This is written in the script, not in the reader.</li>
     <li><b>Saturated pixels.</b> About 90 pixels per frame are at the detector's largest count, 65535. The reference preprocessing does nothing about them, and neither does this.</li>
-    <li><b>The blind gold-ball experiment of the 2025 paper.</b> Its script estimates the probe from one mode, adds a second at iteration 10, and at that iteration also replaces the modes by an orthogonal set (a singular value decomposition). The paper also refines the positions during the run. xptycho does not have the orthogonalization step. Adding it is a change to the algorithm, to be decided.</li>
+    <li><b>The blind gold-ball experiment of the 2025 paper.</b> Its script estimates the probe from one mode, adds a second at iteration 10, and at that iteration also replaces the modes by an orthogonal set (a singular value decomposition). The paper also refines the positions during the run. xptycho has the orthogonalization step (<code>orthogonalize_modes</code>), and demo 3 uses it.</li>
     <li><b>Dataset names inside a CXI file.</b> <code>load_raw</code> uses the standard CXI names (<code>entry_1/instrument_1/detector_1/data</code> and so on). They are fixed in the reader, as the names of the format it reads.</li>
   </ol>
 </div>
