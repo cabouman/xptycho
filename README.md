@@ -1,80 +1,38 @@
 # xptycho
 
-**Under construction.**  xptycho is being written.  The interface is
-designed and documented, and the reconstruction code is being ported
-from ptycho_pmace.  Nothing here runs yet.
+xptycho: ptychographic reconstruction with projected multi-agent consensus
+equilibrium (PMACE) using [PyTorch](https://pytorch.org/).
 
-xptycho reconstructs the complex transmittance image of a thin object
-from a ptychographic scan: far-field diffraction patterns recorded
-while a focused X-ray probe steps across the object in overlapping
-positions.  The method is projected multi-agent consensus equilibrium
-(PMACE).  The object and, when asked, the probe are estimated
-together, with one or more probe modes.  The arithmetic runs through
-PyTorch on a CPU, on one GPU, or divided among the GPUs of one node.
+Features include:
+* Reconstruction of the complex object image, magnitude and phase, from far-field diffraction frames.
+* Estimation of the probe together with the object, with one or more probe modes.
+* Refinement of the probe positions.
+* Preprocessing of raw detector frames: dark subtraction, outlier removal, centering, and cropping.
+* One HDF5 file format for scans, samples, and reconstructions.
+* Demos on simulated data and on measured data, from raw file to image.
+* Seamless operation on 1 or more GPUs, Mac MPS, or CPU.
 
-The output is the complex object image, magnitude and phase both
-retained, with its pixel pitch and origin, in a form that feeds a 3-D
-laminography reconstruction in
-[mbirtorch](https://github.com/cabouman/mbirtorch).
+Full documentation at [https://xptycho.readthedocs.io/](https://xptycho.readthedocs.io/)
 
-xptycho is a new implementation of the PMACE method developed by
-Qiuchen Zhai, Gregery T. Buzzard, Kevin Mertes, Brendt Wohlberg, and
-Charles A. Bouman.  It replaces the research code
-[ptycho_pmace](https://github.com/cabouman/ptycho_pmace) written by
-Qiuchen Zhai.
+Design pages at [https://cabouman.github.io/xptycho/](https://cabouman.github.io/xptycho/)
 
-Full documentation: [xptycho.readthedocs.io](https://xptycho.readthedocs.io).
-
-## Install
-
+Install from the repository:
 ```bash
 git clone git@github.com:cabouman/xptycho.git
 cd xptycho
 pip install .
 ```
 
-## Citation
-
-Please cite the PMACE paper when referencing the method.
-
-```bibtex
-@article{zhai2023pmace,
-  title = {Projected Multi-Agent Consensus Equilibrium ({PMACE}) with application to ptychography},
-  author = {Qiuchen Zhai and Gregery T. Buzzard and Kevin Mertes and Brendt Wohlberg and Charles A. Bouman},
-  journal = {IEEE Transactions on Computational Imaging},
-  volume = {9},
-  pages = {1058--1070},
-  year = {2023},
-  doi = {10.1109/TCI.2023.3328288}
-}
+Reconstruct in a few lines:
+```python
+import xptycho as xpt
+scan = xpt.Scan.load('scan.h5')
+model = xpt.PtychoModel.from_scan(scan)
+recon = model.recon(scan)
+xpt.view_sample(recon)
 ```
 
-Please also cite the blind multi-mode paper when the probe is
-estimated or more than one probe mode is used.
-
-```bibtex
-@article{zhai2025blind,
-  title = {Ptychography using blind multi-mode {PMACE}},
-  author = {Qiuchen Zhai and Gregery T. Buzzard and Kevin Mertes and Brendt Wohlberg and Charles A. Bouman},
-  journal = {IEEE Transactions on Computational Imaging},
-  volume = {11},
-  pages = {1320--1335},
-  year = {2025},
-  doi = {10.1109/TCI.2025.3609957}
-}
-```
-
-Please cite the software itself when referencing this package.
-
-```bibtex
-@misc{xptycho,
-  title = {xptycho: Ptychographic Reconstruction with {PMACE} in {PyTorch}},
-  author = {Charles A. Bouman and Brendt Wohlberg and Gregery T. Buzzard},
-  howpublished = {Software library available from \url{https://github.com/cabouman/xptycho}},
-  note = {Version 0.0.1},
-  year = 2026
-}
-```
-
-GitHub's "Cite this repository" button on the repository page generates the
-paper citation from `CITATION.cff`.
+xptycho implements the PMACE method of Qiuchen Zhai, Gregery T. Buzzard,
+Kevin Mertes, Brendt Wohlberg, and Charles A. Bouman.  For the papers to
+cite, the source of the demo data, and the funding support, see
+[Credits](https://xptycho.readthedocs.io/en/latest/credits.html).
