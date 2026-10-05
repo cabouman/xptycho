@@ -4,7 +4,13 @@
 Installation
 ============
 
-xptycho is installed from source:
+Install xptycho from PyPI:
+
+.. code-block:: bash
+
+   pip install xptycho
+
+To get the demos and the tests as well, install from the repository:
 
 .. code-block:: bash
 
@@ -12,7 +18,7 @@ xptycho is installed from source:
    cd xptycho
    pip install .
 
-This installs the Python dependencies (numpy, scipy, torch, h5py,
+Either way installs the Python dependencies (numpy, scipy, torch, h5py,
 tifffile, matplotlib) automatically.  On Linux, install the CPU or
 CUDA build of torch first if you want to choose it:
 
@@ -20,7 +26,7 @@ CUDA build of torch first if you want to choose it:
 
    pip install torch --index-url https://download.pytorch.org/whl/cpu
 
-To verify the installation, run the test suite:
+To verify an installation from the repository, run the test suite:
 
 .. code-block:: bash
 

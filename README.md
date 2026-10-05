@@ -16,11 +16,9 @@ Full documentation at [https://xptycho.readthedocs.io/](https://xptycho.readthed
 
 Design pages at [https://cabouman.github.io/xptycho/](https://cabouman.github.io/xptycho/)
 
-Install from the repository:
+Install:
 ```bash
-git clone git@github.com:cabouman/xptycho.git
-cd xptycho
-pip install .
+pip install xptycho
 ```
 
 Reconstruct in a few lines:

@@ -63,10 +63,6 @@ object from a ptychographic scan.
 
       How the package was designed, and how it is released.
 
-.. note::
-
-   xptycho is new.  Version 0.0.1 is not yet on PyPI, and the interface may still change.
-
 .. _PyTorch: https://pytorch.org
 
 .. toctree::
