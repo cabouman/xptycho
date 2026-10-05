@@ -4,7 +4,7 @@ name: Design pages
 
 on:
   push:
-    branches: [prerelease, main]
+    branches: [main]
     paths: ['design/**', '.github/workflows/pages.yml']
   workflow_dispatch:
 
