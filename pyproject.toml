@@ -11,6 +11,8 @@ requires-python = ">=3.11"
 dynamic = ["version"]
 authors = [
     { name = "Charles A. Bouman" },
+    { name = "Brendt Wohlberg" },
+    { name = "Gregery T. Buzzard" },
 ]
 dependencies = [
     "numpy",
@@ -23,14 +25,14 @@ dependencies = [
 
 [project.optional-dependencies]
 test = ["pytest"]
-docs = ["sphinx", "sphinx_book_theme", "sphinx-copybutton", "sphinxext-opengraph"]
+docs = ["sphinx", "sphinx_book_theme", "sphinx-copybutton", "sphinxext-opengraph", "sphinx-design"]
 
 [project.urls]
 Homepage = "https://github.com/cabouman/xptycho"
 Documentation = "https://xptycho.readthedocs.io"
 
-[tool.setuptools]
-packages = ["xptycho"]
+[tool.setuptools.packages.find]
+include = ["xptycho*"]
 
 [tool.setuptools.dynamic]
 version = { attr = "xptycho.__version__" }

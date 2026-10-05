@@ -1,198 +1,114 @@
-"""The Scan: the measurement as the instrument recorded it."""
+"""The Scan: the measurement."""
+import h5py
+import numpy as np
+
+from .sample import open_group
+
+HC_KEV_M = 1.2398419843320026e-9     # Planck constant times light speed, keV m
+
+
+def energy_to_wavelength(energy):
+    """Photon energy in keV to wavelength in meters."""
+    return HC_KEV_M / energy
 
 
 class Scan:
-    """A ptychographic measurement: the diffraction frames, the recorded
-    scan positions, the corrections, and the instrument facts.
+    """A ptychographic measurement: the diffraction frames, the scan
+    positions, and the instrument facts.
 
-    A ``Scan`` holds the measured data.  The object grid, the positions
-    used, and the probe are parameters of the
-    :class:`~xptycho.PtychographyModel`, not of the scan.  Frames are
-    detector counts, one per position.  They are held in memory when
-    the scan is small and read from a file in batches when it is not.
-    A reconstruction reads them only through :meth:`batches`, which
-    behaves the same in both cases.  Dark subtraction, the validity
-    mask, the apodization window, and the square root are applied to
-    each batch as it is read.  The stored frames are the raw counts.
-
-    A ``Scan`` is never modified by a reconstruction.
+    A ``Scan`` is never modified by a reconstruction.  Its frames are
+    intensities: detector counts, with any dark subtraction and cropping
+    already done by :func:`~xptycho.preprocess`.  The reconstruction uses
+    their square root.
 
     Args:
-        frames (ndarray or FrameStore): detector counts, shape
-            ``(num_frames, height, width)``.  An array holds the frames
-            in memory; a :class:`FrameStore` reads them from a file.
-        positions (ndarray): ``(num_frames, 2)``, row then column, in
-            metres unless ``position_units='pixel'``.
-        wavelength (float, optional): metres.  Give this or ``energy``.
+        frames (ndarray): intensities, shape ``(num_frames, size, size)``.
+        probe_positions (ndarray): ``(num_frames, 2)``, the row and column of
+            the center of each probe position on the object, in meters.
+        wavelength (float, optional): meters.  Give this or ``energy``.
         energy (float, optional): keV.
-        detector_distance (float, optional): metres.
-        detector_pixel (float, optional): metres, after any binning.
-        detector_center (tuple of float, optional): ``(row, col)`` of the
-            beam center in detector pixels.
-        dark (ndarray, optional): the dark frame in counts, subtracted
-            from every frame as it is read.
-        mask (ndarray, optional): ``(height, width)`` bool, True where
-            the detector pixel is valid.
-        apodization (ndarray, optional): ``(height, width)`` weight
-            multiplied into every frame's amplitude.
-        position_units (str, optional): ``'m'`` (default) or ``'pixel'``.
-        name (str, optional): a label for summaries and saved files.
+        det_distance (float): meters, object to detector.
+        det_pixel_pitch (float): meters, the detector pixel pitch after any
+            binning.
+        name (str, optional): a label for summaries.
 
-    Example:
-        .. code-block:: python
-
-            scan = xptycho.Scan.open('goldballs.h5')
-            print(scan.summary())
-            scan.show('./output/goldballs')
+    In a file, a scan is the group ``/scan`` of an HDF5 file, with datasets
+    ``frames`` and ``probe_positions`` and attributes ``wavelength``,
+    ``det_distance``, ``det_pixel_pitch``, and ``name``.  The same file
+    may also hold a :class:`~xptycho.Sample` in ``/sample``.
     """
 
-    def __init__(self, frames, positions, *, wavelength=None, energy=None,
-                 detector_distance=None, detector_pixel=None, detector_center=None,
-                 dark=None, mask=None, apodization=None, position_units='m', name=None):
-        raise NotImplementedError
+    def __init__(self, frames, probe_positions, *, wavelength=None, energy=None,
+                 det_distance, det_pixel_pitch, name=None):
+        frames = np.asarray(frames)
+        probe_positions = np.asarray(probe_positions, dtype=np.float64)
+        if frames.ndim != 3 or frames.shape[1] != frames.shape[2]:
+            raise ValueError('frames must have shape (num_frames, size, size); got {}'.format(frames.shape))
+        if probe_positions.shape != (frames.shape[0], 2):
+            raise ValueError('probe_positions must have shape ({}, 2); got {}'.format(frames.shape[0], probe_positions.shape))
+        if (wavelength is None) == (energy is None):
+            raise ValueError('give exactly one of wavelength (meters) and energy (keV)')
+        self.frames = frames
+        self.probe_positions = probe_positions
+        self.wavelength = float(wavelength) if wavelength is not None else energy_to_wavelength(energy)
+        self.det_distance = float(det_distance)
+        self.det_pixel_pitch = float(det_pixel_pitch)
+        self.name = name
 
     @property
     def num_frames(self):
         """The number of scan positions."""
-        raise NotImplementedError
+        return self.frames.shape[0]
 
     @property
-    def frame_shape(self):
-        """``(height, width)`` of one frame in detector pixels."""
-        raise NotImplementedError
+    def frame_size(self):
+        """The frames are ``frame_size`` by ``frame_size`` pixels."""
+        return self.frames.shape[1]
 
-    @property
-    def positions(self):
-        """``(num_frames, 2)`` float64, row then column, as recorded."""
-        raise NotImplementedError
-
-    def batches(self, batch_size, device=None):
-        """Yield the frames in batches, corrected and on the device.
-
-        A reconstruction reads the frames only through this method.
-        Each batch is dark subtracted, clipped at zero, masked, apodized,
-        and square-rooted to amplitude as it is read.  When the frames
-        are in a file, the next batch is read into pinned memory while
-        the current batch is used.
-
-        Args:
-            batch_size (int): frames per batch.  The last batch is shorter;
-                the reconstruction loop pads it.
-            device (str or torch.device, optional): where the batch is
-                placed.  Defaults to the CPU.
-
-        Yields:
-            tuple: ``(indices, amplitude)`` with ``indices`` an int64
-            tensor of frame indices in scan order and ``amplitude`` a
-            float32 tensor ``(batch, height, width)``.
-        """
-        raise NotImplementedError
-
-    def select(self, indices):
-        """Return a sub-scan of the listed frames, sharing this scan's
-        frame storage."""
-        raise NotImplementedError
-
-    def parameters(self):
-        """Return the recorded facts as rows with provenance: keys
-        ``name``, ``value``, ``units``, ``origin`` (``given`` or
-        ``file``), and ``note``."""
-        raise NotImplementedError
+    def amplitudes(self):
+        """The square root of the frames, float32; negative values are
+        set to zero first."""
+        return np.sqrt(np.clip(self.frames, 0, None)).astype(np.float32)
 
     def summary(self):
-        """Return a text summary: frame count and size, the recorded
-        instrument facts, the scan extent, which corrections are set,
-        and where the frames live."""
-        raise NotImplementedError
-
-    def show(self, directory=None):
-        """Plot one diffraction frame on a log scale and the position map.
-
-        Args:
-            directory (str, optional): where the figures are saved.  None
-                shows them without saving.
-        """
-        raise NotImplementedError
+        """Return a text summary of the scan."""
+        extent = self.probe_positions.max(axis=0) - self.probe_positions.min(axis=0)
+        lines = [
+            'Scan{}'.format(' "{}"'.format(self.name) if self.name else ''),
+            '  frames:               {} of {} x {} pixels'.format(self.num_frames, self.frame_size, self.frame_size),
+            '  wavelength:           {:.6g} m ({:.6g} keV)'.format(self.wavelength, HC_KEV_M / self.wavelength),
+            '  detector distance:    {:.6g} m'.format(self.det_distance),
+            '  detector pixel pitch: {:.6g} m'.format(self.det_pixel_pitch),
+            '  scan extent:          {:.6g} m by {:.6g} m (rows by columns)'.format(extent[0], extent[1]),
+            '  largest count:        {:.6g}'.format(float(self.frames.max())),
+        ]
+        return '\n'.join(lines)
 
     def save(self, path):
-        """Write the scan to an HDF5 file, streaming the frames.
-
-        The file holds the raw counts chunked one frame per chunk, the
-        positions with their units, the dark frame, the mask, the
-        apodization, the instrument facts, and the provenance of every
-        value.  :meth:`open` reads it back.
-
-        Args:
-            path (str): the file to write.
-        """
-        raise NotImplementedError
-
-    @classmethod
-    def open(cls, path, **facts):
-        """Open a scan file without loading the frames.
-
-        The file may be one written by :meth:`save` or a CXI file; the
-        format is detected.  Any instrument fact passed as a keyword
-        overrides the file's value and is recorded as ``given``.
-
-        Args:
-            path (str): the file.
-            **facts: any constructor argument.
-
-        Returns:
-            Scan
-        """
-        raise NotImplementedError
+        """Write the scan to the group ``/scan`` of an HDF5 file.  A file
+        that exists keeps its other groups."""
+        with h5py.File(path, 'a') as f:
+            g = open_group(f, 'scan')
+            g.create_dataset('frames', data=self.frames, chunks=(1,) + self.frames.shape[1:], compression='gzip',
+                             compression_opts=1, shuffle=True)
+            g.create_dataset('probe_positions', data=self.probe_positions)
+            g['probe_positions'].attrs['units'] = 'm'
+            g['probe_positions'].attrs['order'] = 'row, column'
+            g.attrs['wavelength'] = self.wavelength
+            g.attrs['det_distance'] = self.det_distance
+            g.attrs['det_pixel_pitch'] = self.det_pixel_pitch
+            if self.name:
+                g.attrs['name'] = self.name
 
     @classmethod
-    def from_tiff_folder(cls, folder, *, positions_file='Translations.tsv.txt',
-                         position_columns=('FCx', 'FCy'), **facts):
-        """Read the per-frame TIFF layout of the original ptycho_pmace code.
-
-        The folder holds ``frame_data/`` with one TIFF per frame, sorted
-        by the integer in each filename, and a table whose columns are
-        the column and row of each position in pixels.
-
-        Args:
-            folder (str): the folder.
-            positions_file (str, optional): the table's filename.
-            position_columns (tuple of str, optional): the column names
-                as (column, row); they are swapped to (row, column).
-            **facts: any constructor argument.
-
-        Returns:
-            Scan
-        """
-        raise NotImplementedError
-
-
-class FrameStore:
-    """Frames in a file, read by contiguous range.
-
-    A :class:`Scan` whose frames do not fit in memory holds a
-    ``FrameStore`` in place of the frame array.  A reader for a new
-    file format implements the three members below: the frame count,
-    the frame shape, and a read of frames ``start`` to ``stop`` into a
-    buffer the caller supplies.
-
-    Args:
-        path (str): the file.
-        dataset (str, optional): the dataset inside the file holding the
-            frames, for HDF5-based formats.
-    """
-
-    def __init__(self, path, dataset=None):
-        raise NotImplementedError
-
-    @property
-    def num_frames(self):
-        raise NotImplementedError
-
-    @property
-    def frame_shape(self):
-        raise NotImplementedError
-
-    def read_into(self, start, stop, out):
-        """Read frames ``start`` to ``stop`` into ``out``, a preallocated
-        array of counts, and return it."""
-        raise NotImplementedError
+    def load(cls, path):
+        """Read the scan in the group ``/scan`` of an HDF5 file."""
+        with h5py.File(path, 'r') as f:
+            if 'scan' not in f:
+                raise ValueError('{} holds no scan; its groups are: {}'.format(path, ', '.join(f) or 'none'))
+            g = f['scan']
+            return cls(g['frames'][...], g['probe_positions'][...],
+                       wavelength=float(g.attrs['wavelength']),
+                       det_distance=float(g.attrs['det_distance']),
+                       det_pixel_pitch=float(g.attrs['det_pixel_pitch']),
+                       name=g.attrs.get('name'))

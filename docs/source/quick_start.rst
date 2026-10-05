@@ -1,75 +1,122 @@
 .. _QuickStart:
 
-===========
-Quick Start
-===========
+===============
+Getting Started
+===============
 
-The script below simulates a scan of a known object, reconstructs it
-with the probe held known, and compares the result to the truth.  It
-is the first demo, ``demo/demo_1_simulated_known_probe.py``.
+This page takes you from installation to a reconstruction of your own data in four steps.
 
-.. code-block:: python
+1. Install
+----------
 
-    import xptycho
+Follow the :ref:`installation instructions <InstallationDocs>`.  A conda environment or a
+Python virtual environment is recommended.
 
-    # ---------------------------- Parameters ----------------------------
-    ENERGY = 8.8                    # keV
-    SCAN_GRID = (12, 12)            # scan positions along each axis
-    SCAN_STEP = 68 * 4.52e-9        # m between positions
-    MAX_OFFSET = 5 * 4.52e-9        # m, random offset of each position
-    PEAK_PHOTONS = 1e4              # peak photons in one frame
-    DARK_RATE = 0.5                 # mean dark counts per pixel
-    ITERATIONS = 100
-    OBJECT_DATA_FIT = 0.7           # PMACE object weight
-    PROBE_WEIGHT_EXPONENT = 1.5     # exponent on |probe| in the consensus average
-    RELAXATION = 0.5                # Mann step size
-    OUTPUT_DIR = './output/demo_1_simulated_known_probe'
-    # --------------------------------------------------------------------
+2. Run the first demo
+---------------------
 
-    truth = xptycho.demo_data('synthetic')       # ground truth object and probe
+The demo scripts are in the `demo folder <https://github.com/cabouman/xptycho/blob/main/demo/>`__
+of the repository.  The first one simulates a scan of a known object, reconstructs it with
+the probe known, and compares the result with the truth.  Run it from the repository root::
 
-    scan = xptycho.simulate_scan(truth, grid=SCAN_GRID, step=SCAN_STEP,
-                                 max_offset=MAX_OFFSET, energy=ENERGY,
-                                 peak_photons=PEAK_PHOTONS, dark_rate=DARK_RATE, seed=0)
+    python demo/demo_1_simulated_known_probe.py
+
+It downloads a small data file on first run and takes a few seconds on a GPU.  It prints the
+scan, the parameters, one line per iteration, and the error to the truth, and it writes
+figures to ``demo/output/demo_1_simulated_known_probe``.  If it runs, the installation is
+working.  The other demos are listed in :ref:`DemosDocs`.
+
+3. Reconstruct your own data
+----------------------------
+
+Put your data in two numpy arrays and three numbers:
+
+- ``frames``: a 3D array with shape ``(positions, size, size)``.  Each frame is a diffraction
+  pattern in detector counts, with the dark level subtracted, cropped to an even ``size``
+  with the beam at the center.
+- ``probe_positions``: a 2D array with shape ``(positions, 2)``: the row and the column of the
+  center of the probe on the object at each frame, **in meters**.
+- The photon ``energy`` in keV (or the ``wavelength`` in meters), the ``det_distance``
+  in meters from the object to the detector, and the ``det_pixel_pitch`` pitch in meters.
+
+These go into a :class:`~xptycho.Scan`.  A :class:`~xptycho.PtychoModel` is built from the
+scan, and its :meth:`~xptycho.PtychoModel.recon` method does the reconstruction::
+
+    import xptycho as xpt
+
+    scan = xpt.Scan(frames, probe_positions, energy=8.8, det_distance=2.0, det_pixel_pitch=75e-6)
     print(scan.summary())
-    scan.show(OUTPUT_DIR)            # one diffraction frame and the position map
+    xpt.view_scan(scan)                           # one frame and the map of positions
 
-    # The forward model: the scan's geometry and the known probe.
-    model = xptycho.FarFieldModel.from_scan(scan, probe=truth.probe)
-    model.print_params()             # every value with its units and its origin
+    model = xpt.PtychoModel.from_scan(scan)
+    model.print_params()                          # every parameter, its units, and its origin
+    recon = model.recon(scan, iterations=100)     # no probe given, so it is estimated
 
-    # The reconstruction: invert the forward model by PMACE.
-    recon = model.recon(scan, method='pmace', iterations=ITERATIONS,
-                        object_data_fit=OBJECT_DATA_FIT,
-                        probe_weight_exponent=PROBE_WEIGHT_EXPONENT,
-                        relaxation=RELAXATION)
-    print(recon.summary())
-    recon.show(OUTPUT_DIR, compare_to=truth)     # phase, magnitude, error images
-    recon.save(OUTPUT_DIR, compare_to=truth)     # summary, parameters, recon.h5, plots
+    xpt.view_sample(recon)                        # the object, the probe, the data-error curve
+    recon.save('./output/my_scan.h5')
+    image = recon.object                          # complex array; recon.pixel_pitch is in meters
 
-For measured data the workflow has one more step: a script that
-preprocesses the raw frames into a scan file, which the reconstruction
-script then opens.  The probe is unknown there, so the model estimates
-it, with two modes.
+The object pixel pitch is not something you choose.  It follows from the instrument:
+wavelength times detector distance, divided by frame size times detector pitch.  Check it in
+the printed parameters; if it is wrong, one of the three numbers is wrong.
 
-.. code-block:: python
+The result is a :class:`~xptycho.Sample`: the object and the probe it was seen with.
+``recon.object`` is the complex image, ``recon.phase`` and ``recon.magnitude`` are its two
+parts, and ``recon.probe`` holds the probe modes.  ``recon.run`` is the record of the run;
+``recon.run.data_error`` is the mismatch between the data and the forward model at each
+iteration.  ``recon.save`` writes an HDF5 file that
+:meth:`Sample.load <xptycho.Sample.load>` reads back.
 
-    scan = xptycho.Scan.open('goldballs.h5')
-    model = xptycho.FarFieldModel.from_scan(scan, estimate_probe=True, probe_modes=2)
-    recon = model.recon(scan, method='pmace', iterations=200,
-                        object_data_fit=0.5, probe_data_fit=0.6,
-                        probe_weight_exponent=1.25, relaxation=0.5,
-                        add_mode_iterations=[20], mode_energy_fraction=0.1)
-    probe = model.get_params('probe')            # the estimate, origin 'estimated'
+4. Adjust the reconstruction
+----------------------------
 
-Known and unknown
------------------
+**The probe.**  If you know the probe, pass it and it is held fixed::
 
-A probe passed to the model is known and held fixed.
-``estimate_probe=True`` makes it an unknown, estimated with the object,
-starting from the array when one is given and from the data otherwise;
-the estimate is stored back in the model with origin ``estimated``.
-``probe_modes`` sets how many probe modes the model has, and the
-algorithm's ``add_mode_iterations`` says when each is introduced.
-The device, the batch size, and where the per-position state is kept
-are chosen automatically and printed.
+    recon = model.recon(scan, probe=my_probe, iterations=100)
+
+If you have a good guess, pass it as the starting point and it is refined::
+
+    recon = model.recon(scan, init_probe=my_guess, iterations=100)
+
+**The starting probe.**  With no probe given, the starting probe is computed from the
+data.  Setting ``probe_fresnel_radius_pixels`` Fresnel propagates it, spreading each point over
+that radius in pixels, which gives it the curvature of a focused beam and usually helps::
+
+    model.set_params(probe_fresnel_radius_pixels=22)
+
+**Several probe modes.**  A partially coherent beam needs more than one mode.  Say how many
+when you build the model, and at which iterations each extra mode is added::
+
+    model = xpt.PtychoModel.from_scan(scan, num_probe_modes=2)
+    model.set_params(mode_schedule=[20], probe_fresnel_radius_pixels=22)
+    recon = model.recon(scan, iterations=200)
+    print(recon.mode_energies)                    # the share of the energy in each mode
+
+**The data-fit weights.**  ``object_data_fit`` (default 0.6) sets how strongly each
+position pulls its patch toward its own frame.  Lower it for noisy data.
+``probe_data_fit`` does the same for the probe::
+
+    model.set_params(object_data_fit=0.5, probe_data_fit=0.6)
+
+**More iterations.**  Continue from a result instead of starting over::
+
+    recon = model.recon(scan, init=recon, iterations=100)
+
+**The scan positions.**  If the recorded positions may be off by a pixel or so, test it.
+:meth:`~xptycho.PtychoModel.refine_probe_positions` tries shifted positions and reports how much
+each one would improve the fit.  It changes nothing until you accept the result.  Position
+refinement is experimental.  Fix the object grid before setting the new positions, so that the
+earlier result still fits it::
+
+    new_positions, gain = model.refine_probe_positions(scan, recon.object, recon.probe)
+    model.set_params(object_shape=recon.object.shape, object_origin=recon.origin)
+    model.set_params(probe_positions=new_positions)
+    recon = model.recon(scan, init=recon, iterations=100)
+
+**The devices.**  Without a call, every GPU on the node is used.  To choose::
+
+    model.configure_devices(num_devices=1)             # one GPU, for a run that repeats exactly
+    model.configure_devices(devices=['cpu'])           # no GPU
+
+The parameters are listed with :meth:`~xptycho.PtychoModel.print_params`, and every class and
+function is described in :ref:`UserAPIDocs`.

@@ -4,70 +4,84 @@
 User API
 ========
 
-xptycho is organized around one idea.  A :class:`~xptycho.PtychographyModel`
-is the forward map from an object image to the amplitudes measured at
-the scan positions.  An algorithm such as :class:`~xptycho.PMACE` is a
-way to invert that map.  One loop reads the scan positions in batches
-and runs the chosen algorithm on the chosen model.  Every physical fact
-is a model parameter or a model subclass.  Every numerical choice is
-part of an algorithm.
-
-A reconstruction is three steps:
-
-1. **Load or simulate** the measurement into a :class:`~xptycho.Scan`
-   (:ref:`ScanDocs`).  Measured data goes through
-   :func:`~xptycho.preprocess` first.
-2. **Build the model** from the scan's geometry and what is known about
-   the probe, and **reconstruct** with its
-   :meth:`~xptycho.PtychographyModel.recon` method (:ref:`ModelDocs`).
-3. **Review** the returned :class:`~xptycho.Reconstruction`
-   (:ref:`ReconstructionDocs`).
+xptycho has three objects.  A :class:`~xptycho.Scan` holds the
+measurement.  A :class:`~xptycho.PtychoModel` holds the parameters and
+the forward model.  Its :meth:`~xptycho.PtychoModel.recon` method
+returns a :class:`~xptycho.Sample`: the object and the probe, with the
+record of the run.  A ground truth is also a :class:`~xptycho.Sample`.  The design is described on the
+`design pages <https://cabouman.github.io/xptycho/>`_.
 
 .. code-block:: python
 
-    scan = xptycho.Scan.open('scan.h5')
-
-    model = xptycho.FarFieldModel.from_scan(scan, probe=known_probe)
-    recon = model.recon(scan, method='pmace', iterations=100)
-
-    model = xptycho.FarFieldModel.from_scan(scan, estimate_probe=True, probe_modes=2)
-    recon = model.recon(scan, method='pmace', iterations=200, add_mode_iterations=[20])
+    scan = xpt.Scan.load('scan.h5')
+    model = xpt.PtychoModel.from_scan(scan, num_probe_modes=2)
+    model.set_params(object_data_fit=0.5, mode_schedule=[20], probe_fresnel_radius_pixels=22)
+    recon = model.recon(scan, iterations=200)        # probe not given, so estimated
 
     print(recon.summary())
-    recon.show(OUTPUT_DIR)
-    recon.save(OUTPUT_DIR)
-
-Streaming and large scans
--------------------------
-
-The script above does not change when the scan is too large for
-memory.  A :class:`~xptycho.Scan` opened from a file keeps its frames
-in the file and reads them in batches through
-:meth:`~xptycho.Scan.batches`.  A reconstruction reads the frames only
-through that method.  The loop accumulates the algorithm's sums across the
-batches and reduces them once per pass, so the result does not depend
-on the batch size.  The per-position state of the iteration, which is
-larger than the frames, is placed on the GPU if it fits there, else
-in host memory if it fits there, else in a file.  The choice is
-printed.  On a node with
-several GPUs the positions are split across them by
-:meth:`~xptycho.PtychographyModel.configure_devices`, and one process
-drives them all.  A run given a checkpoint directory writes
-checkpoints on an interval and resumes from them when the same script
-runs again.  See :ref:`LoopDocs` for the loop and the state.
-
-.. _ModelDocs:
+    xpt.view_sample(recon)
+    recon.save(OUTPUT_DIR + '/recon.h5')
 
 The model
 ---------
 
-.. autoclass:: xptycho.PtychographyModel
+.. autoclass:: xptycho.PtychoModel
    :members:
 
-.. autoclass:: xptycho.FarFieldModel
-   :members:
+Reconstruction parameters
+-------------------------
 
-.. _ScanDocs:
+Set with :meth:`~xptycho.PtychoModel.set_params`, read with
+:meth:`~xptycho.PtychoModel.get_params`, and listed with their values, units, and origins by
+:meth:`~xptycho.PtychoModel.print_params`.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 14 56
+
+   * - name
+     - default
+     - meaning
+   * - ``object_data_fit``
+     - 0.6
+     - How far each object patch moves toward the patch that fits its frame, between 0 and 1
+       (:math:`\alpha_1` in the papers).
+   * - ``probe_data_fit``
+     - 0.6
+     - The same for each probe copy (:math:`\alpha_2`).
+   * - ``probe_weight_exponent``
+     - 1.25
+     - The power of the probe magnitude that weights a patch when the patches are averaged
+       into the object (:math:`\kappa`), between 1 and 2.
+   * - ``relaxation``
+     - 0.5
+     - The step size of the iteration (:math:`\rho`), between 0 and 1.
+   * - ``mode_schedule``
+     - none
+     - The iterations at which a probe mode is added, until the probe has ``num_probe_modes``
+       modes.
+   * - ``mode_energy_fraction``
+     - 0.05
+     - The share of the probe energy a new mode starts with.
+   * - ``orthogonalize_modes``
+     - off
+     - Replace the modes by an orthogonal set each time a mode is added.
+   * - ``probe_fresnel_radius_pixels``
+     - 0
+     - Pixels.  The starting probe and each new mode are Fresnel propagated, and this is the
+       radius over which the propagation spreads each point of the field.  0 means no
+       propagation.  For a propagation distance z it equals sqrt(wavelength * z) /
+       ``sample_pixel_pitch``.
+   * - ``object_shape``
+     - from the positions
+     - The rows and columns of the object grid.  By default the smallest grid that holds
+       every patch.
+   * - ``object_origin``
+     - from the positions
+     - Meters.  The position of the center of the first pixel of the object grid.
+   * - ``batch_size``
+     - from the memory
+     - The positions processed together on a device.
 
 The scan
 --------
@@ -75,67 +89,64 @@ The scan
 .. autoclass:: xptycho.Scan
    :members:
 
-.. autoclass:: xptycho.FrameStore
+The sample
+----------
+
+.. autoclass:: xptycho.Sample
    :members:
 
-.. autofunction:: xptycho.preprocess
-
-.. _ReconstructionDocs:
-
-The reconstruction
-------------------
-
-.. autoclass:: xptycho.Reconstruction
-   :members:
+.. autoclass:: xptycho.RunRecord
 
 .. autofunction:: xptycho.nrmse
 
-Algorithms
+.. autofunction:: xptycho.match_scale
+
+File format
+-----------
+
+A scan and a sample are groups of an HDF5 file.  One file may hold either or both; each
+class reads and writes only its own groups and keeps the others.  Lengths are in meters.
+
+.. code-block:: text
+
+    file.h5                 attribute: format_version
+        /scan               attributes: wavelength, det_distance, det_pixel_pitch, name
+            frames          (J, n, n) intensities
+            probe_positions (J, 2), row and column of each probe center
+        /sample             attributes: pixel_pitch, origin, name
+            object          complex64 (rows, cols)
+            probe           complex64 (K, n, n)
+        /run                attribute: iterations.  Present for a reconstruction.
+            parameters      (N, 4) text: name, value, units, origin
+            data_error      (iterations,)
+            probe_positions (J, 2), the positions the run used
+            coverage        (rows, cols), the accumulated probe weight
+
+Viewing
+-------
+
+The viewing functions are separate from the objects they show.  Each makes
+figures, puts them on the screen, and returns them; the windows zoom and pan
+with the mouse.  The part of the object shown is an argument, chosen in the
+script.
+
+.. autofunction:: xptycho.view_scan
+
+.. autofunction:: xptycho.view_sample
+
+.. autofunction:: xptycho.save_figures
+
+Demo tools
 ----------
 
-.. autoclass:: xptycho.PMACE
-   :members:
-
-.. autofunction:: xptycho.refine_positions
-
-.. _LoopDocs:
-
-The loop and the state
-----------------------
-
-For full control of a run, or to write a new algorithm.
-
-.. autoclass:: xptycho.ReconLoop
-   :members:
-
-.. autoclass:: xptycho.StateArray
-   :members:
-
-.. autoclass:: xptycho.Batch
-
-Simulation and ground truth
----------------------------
-
-.. autoclass:: xptycho.GroundTruth
+.. autofunction:: xptycho.download
 
 .. autofunction:: xptycho.scan_positions
-
-.. autofunction:: xptycho.simulate_scan
-
-Data
-----
-
-.. autofunction:: xptycho.demo_data
-
-.. autofunction:: xptycho.fetch
-
-.. autofunction:: xptycho.download_and_extract
 
 Operators
 ---------
 
-The kernels the model is built from, public so that a new model or
-algorithm can be written from them.
+The building blocks of the forward model.
 
 .. automodule:: xptycho.operators
    :members:

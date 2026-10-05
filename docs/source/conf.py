@@ -12,7 +12,7 @@ sys.path.insert(0, os.path.abspath('../..'))
 
 project = 'xptycho'
 copyright = '2026, Charles A. Bouman'
-author = 'Charles A. Bouman'
+author = 'Charles A. Bouman, Brendt Wohlberg, and Gregery T. Buzzard'
 
 import xptycho
 release = xptycho.__version__
@@ -27,6 +27,7 @@ extensions = [
     'sphinx_copybutton',
     'sphinxext.opengraph',
     'matplotlib.sphinxext.plot_directive',
+    'sphinx_design',
 ]
 
 templates_path = ['_templates']

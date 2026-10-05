@@ -3,31 +3,22 @@
 xptycho reconstructs the complex transmittance image of a thin object
 from a ptychographic scan: far-field diffraction patterns recorded
 while a focused X-ray probe steps across the object in overlapping
-positions.  A :class:`PtychographyModel` is the forward map from an
-object image to the amplitudes at the scan positions; an algorithm
-such as :class:`PMACE` is a way to invert that map; and one loop
-streams the positions through them, so the data need not fit in
-memory and the arithmetic runs on CPUs or GPUs through PyTorch.
+positions.  A :class:`Scan` holds the measurement, a :class:`PtychoModel`
+holds the parameters and the forward model, and
+:meth:`PtychoModel.recon` returns a :class:`Sample`: the object and the
+probe.
 """
 
-__version__ = '0.0.1'
+__version__ = '0.1.0'
 
-from .model import PtychographyModel, FarFieldModel
-from .scan import Scan, FrameStore
-from .reconstruction import Reconstruction
-from .pmace import PMACE
-from .loop import ReconLoop, StateArray, Batch
-from .simulate import GroundTruth, scan_positions, simulate_scan
-from .preprocess import preprocess
-from .datasets import DATASETS, download_and_extract, fetch, demo_data
-from .metrics import nrmse
-from .refine import refine_positions
+from .scan import Scan, energy_to_wavelength
+from .model import PtychoModel
+from .sample import Sample, RunRecord
+from .metrics import nrmse, match_scale
+from .view import view_scan, view_sample, save_figures
+from .datasets import download, scan_positions
 from . import operators
+from . import preprocess
 
-__all__ = [
-    'PtychographyModel', 'FarFieldModel', 'Scan', 'FrameStore', 'Reconstruction',
-    'PMACE', 'ReconLoop', 'StateArray', 'Batch',
-    'GroundTruth', 'scan_positions', 'simulate_scan', 'preprocess',
-    'DATASETS', 'download_and_extract', 'fetch', 'demo_data',
-    'nrmse', 'refine_positions', 'operators',
-]
+__all__ = ['Scan', 'PtychoModel', 'Sample', 'RunRecord', 'download', 'scan_positions', 'view_scan', 'view_sample', 'save_figures', 'nrmse',
+           'match_scale', 'energy_to_wavelength', 'operators', 'preprocess']

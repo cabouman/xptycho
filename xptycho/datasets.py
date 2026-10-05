@@ -1,69 +1,57 @@
-"""Datasets: the registry, the download helper, and the demo ground truth."""
+"""Tools for demos: a file download and simple scan patterns."""
+import os
+import subprocess
+import urllib.error
+import urllib.request
 
-#: One record per dataset the demos use: url, size in bytes, sha256, and
-#: the citation.  Only this registry knows URLs.
-DATASETS = {
-    'demo_xptycho_data': {
-        'url': 'https://www.datadepot.rcac.purdue.edu/bouman/data/demo_xptycho_data.tgz',
-        'size': None, 'sha256': None,
-        'citation': 'Ground truth from the PMACE papers (Zhai et al., IEEE TCI 2023, 2025).',
-    },
-    'goldballs_cxi': {
-        'url': 'https://cxidb.org/data/65/AuBalls_700ms_30nmStep_3_full.cxi',
-        'size': 632484560, 'sha256': None,
-        'citation': ('S. Marchesini, "Ptychography Gold Ball Example Dataset," CXIDB ID 65, '
-                     'Lawrence Berkeley National Laboratory, 2017, doi:10.11577/1454414.'),
-    },
-}
+import numpy as np
 
 
-def download_and_extract(url, save_dir=None, sha256=None, expected_size=None):
-    """Download a file and, when it is a tar archive, extract it.
-
-    The download resumes if interrupted, is checked against the size and
-    checksum when they are given, never asks a question, and prints one
-    line per ten percent.  A file already present and passing its check
-    is not downloaded again.  When there is no network, the error names
-    the URL and the path to put the file at by hand.
+def download(url, directory):
+    """Download a file into a directory, unless it is already there.
 
     Args:
-        url (str): the file.
-        save_dir (str, optional): the folder to write into.  Defaults to
-            the ``XPTYCHO_DATA_DIR`` environment variable, else
-            ``./demo/input``.
-        sha256 (str, optional): the expected checksum.
-        expected_size (int, optional): the expected size in bytes.
+        url (str): the address of the file.
+        directory (str): the local directory.  It is created if needed.
 
     Returns:
-        str: the extracted folder for an archive, else the file path.
+        str: the path of the local file, named as in the address.
     """
-    raise NotImplementedError
+    path = os.path.join(directory, os.path.basename(url))
+    if os.path.isfile(path):
+        return path
+    os.makedirs(directory, exist_ok=True)
+    print('downloading {} to {}'.format(url, path))
+    partial = path + '.part'
+    try:
+        urllib.request.urlretrieve(url, partial)
+    except urllib.error.URLError:
+        # Some servers refuse Python's downloader or do not send their
+        # intermediate certificate, which Python cannot verify; curl works.
+        result = subprocess.run(['curl', '-L', '--fail', '-sS', '-o', partial, url], capture_output=True, text=True)
+        if result.returncode != 0:
+            raise RuntimeError('could not download {}: {}'.format(url, result.stderr.strip()))
+    os.replace(partial, path)
+    return path
 
 
-def fetch(name, save_dir=None):
-    """Download a registered dataset and return its local path.
+def scan_positions(grid, step, max_offset=0.0, seed=0):
+    """The positions of a rectangular scan, with a random offset at each.
 
     Args:
-        name (str): a key of :data:`DATASETS`.
-        save_dir (str, optional): as in :func:`download_and_extract`.
+        grid (tuple of int): the number of positions along rows and columns.
+        step (float): meters between neighboring positions.
+        max_offset (float, optional): meters.  Each position is moved by a
+            uniform random amount up to this along each axis.  Defaults to 0.
+        seed (int, optional): the random seed of the offsets.
 
     Returns:
-        str: the local path.
+        ndarray: ``(grid[0] * grid[1], 2)``, row then column, in meters,
+        centered on zero.
     """
-    raise NotImplementedError
-
-
-def demo_data(name, save_dir=None):
-    """Return the ground truth of a demo, downloading it on first use.
-
-    Args:
-        name (str): ``'synthetic'`` (the 800 x 800 object and 256 x 256
-            probe at 8.8 keV of the 2023 paper, object pixel 4.52 nm) or
-            ``'blind'`` (the object and two probe modes of the 2025
-            paper's two-mode experiment, object pixel 2.4 nm).
-        save_dir (str, optional): as in :func:`download_and_extract`.
-
-    Returns:
-        GroundTruth
-    """
-    raise NotImplementedError
+    rows = (np.arange(grid[0]) - (grid[0] - 1) / 2) * step
+    cols = (np.arange(grid[1]) - (grid[1] - 1) / 2) * step
+    probe_positions = np.stack(np.meshgrid(rows, cols, indexing='ij'), axis=-1).reshape(-1, 2)
+    if max_offset:
+        probe_positions = probe_positions + np.random.default_rng(seed).uniform(-max_offset, max_offset, probe_positions.shape)
+    return probe_positions

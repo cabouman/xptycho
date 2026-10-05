@@ -1,372 +1,484 @@
-"""The forward model: from an object image to the amplitudes at the scan
-positions, and the reconstruction that inverts it."""
+"""The PtychoModel: the parameters and the forward model."""
+import time
+
+import numpy as np
+import torch
+from scipy.ndimage import gaussian_filter
+
+from . import operators as op
+from ._sharding import Layout
+from .pmace import Run, fresnel_propagate
+from .sample import RunRecord, Sample
+from .scan import HC_KEV_M, Scan, energy_to_wavelength
+
+# name: (default, units)
+RECON_DEFAULTS = {
+    'object_data_fit': (0.6, ''),
+    'probe_data_fit': (0.6, ''),
+    'probe_weight_exponent': (1.25, ''),
+    'relaxation': (0.5, ''),
+    'mode_schedule': ((), 'iterations'),
+    'mode_energy_fraction': (0.05, ''),
+    'orthogonalize_modes': (False, ''),
+    'probe_fresnel_radius_pixels': (0.0, 'pixels'),
+    'object_shape': (None, 'pixels'),
+    'object_origin': (None, 'm'),
+    'batch_size': (None, 'positions'),
+}
+INITIAL_FILTER_SIGMA = 1.0     # pixels; smooths the starting object and probe
 
 
-class PtychographyModel:
-    """The forward model of a ptychographic scan and the entry point for
-    reconstruction.
+class PtychoModel:
+    """The far-field forward model of a ptychographic scan, with the
+    parameters of a reconstruction.
 
-    A model holds every physical fact of the measurement: the scan
-    positions used, the probe modes, the object grid (shape, origin,
-    pixel size), and the instrument facts the pixel size follows from.
-    It computes the projections between the object and the data, and
-    :meth:`recon` inverts them with a chosen algorithm.  The frames are
-    not part of the model.  They are in a :class:`~xptycho.Scan`, which
-    is passed to the methods that need it, so a model can be built and
-    used without data, for example to simulate.
-
-    This base class holds everything that does not depend on how light
-    propagates from the object to the detector.  A subclass supplies
-    the propagator and the relation that gives the object pixel size;
-    :class:`FarFieldModel` is the far-field (Fraunhofer) model of the
-    PMACE papers.
-
-    Every parameter is recorded with its provenance: ``given`` by the
-    user, read from a ``file``, ``derived`` from other facts, a package
-    ``default``, or ``estimated`` by a reconstruction.
-    :meth:`print_params` shows the table.
-
-    The positions in the model are the positions used.  A
-    :class:`~xptycho.Scan` keeps the positions as recorded, and a
-    refinement updates the model, never the scan.  The probe is a model
-    parameter: with ``estimate_probe=True`` it is an unknown, and after
-    a reconstruction the estimate is stored in the model with origin
-    ``estimated``.
+    A model holds three kinds of parameters and no image or probe.  The
+    forward-model parameters are given here and fix the forward model.  The
+    reconstruction parameters are set and read by name with
+    :meth:`set_params` and :meth:`get_params`.  The devices are chosen with
+    :meth:`configure_devices`.  The object and the probe are arguments of
+    :meth:`forward`, :meth:`simulate`, and :meth:`recon`, and come back
+    from :meth:`recon` in a :class:`~xptycho.Sample`.
 
     Args:
-        frame_shape (tuple of int): ``(height, width)`` of a frame in
-            detector pixels.
-        positions (ndarray): ``(num_positions, 2)``, row then column, in
-            metres unless ``position_units='pixel'``.
-        wavelength (float, optional): metres.  Give this or ``energy``.
-        energy (float, optional): keV, converted to the wavelength.
-        detector_distance (float, optional): metres, sample to detector.
-        detector_pixel (float, optional): metres, the detector pixel
-            pitch after any binning.
-        detector_center (tuple of float, optional): ``(row, col)`` of the
-            beam center on the detector, in pixels.  Defaults to the
-            frame center.
-        probe (ndarray, optional): complex ``(height, width)`` or
-            ``(modes, height, width)``.  The known probe, or the starting
-            estimate when ``estimate_probe`` is True.
-        probe_modes (int, optional): the number of probe modes.  Modes
-            add in intensity and represent partial coherence.  Defaults
-            to 1, or to the number given in ``probe``.
-        estimate_probe (bool, optional): the probe is unknown and is
-            estimated with the object.  Defaults to False.
-        position_units (str, optional): ``'m'`` (default) or ``'pixel'``.
-            Pixels are allowed only when the geometry is not given, and
-            then the pixel size is reported as not known.
-        margin (int, optional): pixels of object grid added beyond the
-            outermost patch on every side.  Defaults to 0.
+        wavelength (float, optional): meters.  Give this or ``energy``.
+        energy (float, optional): keV.
+        det_distance (float): meters, object to detector.
+        det_pixel_pitch (float): meters, the detector pixel pitch.
+        frame_size (int): the frames are ``frame_size`` square; even.
+        probe_positions (ndarray): ``(J, 2)``, the row and column of the center
+            of each probe position on the object, in meters.
+        num_probe_modes (int, optional): the number of probe modes.  Defaults
+            to 1.
 
     Example:
         .. code-block:: python
 
-            model = xptycho.FarFieldModel.from_scan(scan, probe=known_probe)
-            model.print_params()
-            recon = model.recon(scan, iterations=100)
+            model = xptycho.PtychoModel.from_scan(scan, num_probe_modes=2)
+            model.set_params(object_data_fit=0.5, mode_schedule=[20])
+            recon = model.recon(scan, iterations=200)
     """
 
-    def __init__(self, frame_shape, positions, *, wavelength=None, energy=None,
-                 detector_distance=None, detector_pixel=None, detector_center=None,
-                 probe=None, probe_modes=1, estimate_probe=False,
-                 position_units='m', margin=0):
-        raise NotImplementedError
+    def __init__(self, *, wavelength=None, energy=None, det_distance, det_pixel_pitch,
+                 frame_size, probe_positions, num_probe_modes=1, _origin='given'):
+        if (wavelength is None) == (energy is None):
+            raise ValueError('give exactly one of wavelength (meters) and energy (keV)')
+        if frame_size % 2:
+            raise ValueError('frame_size must be even; got {}'.format(frame_size))
+        probe_positions = np.asarray(probe_positions, dtype=np.float64)
+        if probe_positions.ndim != 2 or probe_positions.shape[1] != 2:
+            raise ValueError('probe_positions must have shape (J, 2); got {}'.format(probe_positions.shape))
+        self.wavelength = float(wavelength) if wavelength is not None else energy_to_wavelength(energy)
+        self.det_distance = float(det_distance)
+        self.det_pixel_pitch = float(det_pixel_pitch)
+        self.frame_size = int(frame_size)
+        self.probe_positions = probe_positions
+        self.num_probe_modes = int(num_probe_modes)
+        self._fmodel_origin = _origin
+        self._recon = {name: default for name, (default, _) in RECON_DEFAULTS.items()}
+        self._given = set()
+        self._devices = None
 
     @classmethod
-    def from_scan(cls, scan, **params):
-        """Build a model from the geometry a scan recorded.
-
-        The frame shape, the positions, and the instrument facts come
-        from the scan with origin ``file`` (or ``given``, when the scan
-        was built from arrays).  Any parameter passed here overrides the
-        scan's value and is recorded as ``given``.
-
-        Args:
-            scan (Scan): the measurement.
-            **params: any constructor argument.
-
-        Returns:
-            PtychographyModel: an instance of the class this is called on.
-        """
-        raise NotImplementedError
+    def from_scan(cls, scan, num_probe_modes=1, **overrides):
+        """Build a model from the facts a scan recorded.  Any constructor
+        argument passed here overrides the scan's value."""
+        facts = dict(wavelength=scan.wavelength, det_distance=scan.det_distance,
+                     det_pixel_pitch=scan.det_pixel_pitch, frame_size=scan.frame_size,
+                     probe_positions=scan.probe_positions)
+        if 'energy' in overrides:
+            facts.pop('wavelength')
+        facts.update(overrides)
+        return cls(num_probe_modes=num_probe_modes, _origin='given' if overrides else 'file', **facts)
 
     # ------------------------------------------------------------ parameters
-    def set_params(self, **params):
-        """Set model parameters by name, with origin ``given``.
+    @property
+    def sample_pixel_pitch(self):
+        """The object pixel pitch in meters: wavelength times
+        detector distance over frame size times detector pitch."""
+        return self.wavelength * self.det_distance / (self.frame_size * self.det_pixel_pitch)
 
-        Accepts every constructor argument, plus ``object_shape``,
-        ``origin``, ``batch_size``, ``devices``, and ``deterministic``.
-        Setting the positions or the probe changes the forward model;
-        setting the batch size or the devices changes only where the
-        arithmetic runs.
-        """
-        raise NotImplementedError
+    def set_params(self, **params):
+        """Set reconstruction parameters by name.  ``probe_positions`` may also be
+        set, to replace the scan positions with refined ones."""
+        for name, value in params.items():
+            if name == 'probe_positions':
+                value = np.asarray(value, dtype=np.float64)
+                if value.shape != self.probe_positions.shape:
+                    raise ValueError('probe_positions must have shape {}; got {}'.format(self.probe_positions.shape, value.shape))
+                self.probe_positions = value
+                self._fmodel_origin = 'given'
+            elif name in self._recon:
+                self._recon[name] = value
+                self._given.add(name)
+            else:
+                raise ValueError('"{}" is not a reconstruction parameter; the parameters are: {}'.format(
+                    name, ', '.join(self._recon)))
 
     def get_params(self, names):
         """Return one parameter, or a list for a list of names."""
-        raise NotImplementedError
+        def one(name):
+            if name in self._recon:
+                return self._recon[name]
+            if name in ('wavelength', 'det_distance', 'det_pixel_pitch', 'frame_size', 'probe_positions',
+                        'num_probe_modes', 'sample_pixel_pitch'):
+                return getattr(self, name)
+            raise ValueError('"{}" is not a parameter'.format(name))
+        return one(names) if isinstance(names, str) else [one(n) for n in names]
 
     def parameters(self):
-        """Return the parameter table.
-
-        Returns:
-            list of dict: one row per parameter with keys ``name``,
-            ``value``, ``units``, ``origin``, and ``note`` (the formula
-            of a derived value, or the file a value was read from).
-        """
-        raise NotImplementedError
+        """Return every parameter as a row with its value, units, and
+        origin (given, file, derived, or default)."""
+        shape, origin = self._grid()
+        rows = [
+            ('wavelength', self.wavelength, 'm', self._fmodel_origin),
+            ('energy', HC_KEV_M / self.wavelength, 'keV', 'derived'),
+            ('det_distance', self.det_distance, 'm', self._fmodel_origin),
+            ('det_pixel_pitch', self.det_pixel_pitch, 'm', self._fmodel_origin),
+            ('frame_size', self.frame_size, 'pixels', self._fmodel_origin),
+            ('probe_positions', '{} positions'.format(len(self.probe_positions)), 'm', self._fmodel_origin),
+            ('num_probe_modes', self.num_probe_modes, '', 'given'),
+            ('sample_pixel_pitch', self.sample_pixel_pitch, 'm', 'derived'),
+        ]
+        for name, (_, units) in RECON_DEFAULTS.items():
+            value, source = self._recon[name], 'given' if name in self._given else 'default'
+            if name == 'object_shape' and value is None:
+                value, source = shape, 'derived'
+            if name == 'object_origin' and value is None:
+                value, source = origin, 'derived'
+            rows.append((name, value, units, source))
+        rows.append(('devices', ', '.join(str(d) for d in self._device_list()), '',
+                     'given' if self._devices else 'default'))
+        return [dict(name=n, value=v, units=u, origin=o) for n, v, u, o in rows]
 
     def print_params(self):
-        """Print the parameter table."""
-        raise NotImplementedError
+        """Print every parameter with its value, units, and origin."""
+        rows = self.parameters()
+        width = max(len(row['name']) for row in rows)
+        for row in rows:
+            print('{:<{w}}  {}  {}  [{}]'.format(row['name'], row['value'], row['units'], row['origin'], w=width))
 
-    def summary(self):
-        """Return a text summary: the object grid, the pixel size and its
-        origin, the scan extent, the overlap fraction, the probe modes
-        and whether they are estimated, and the compute settings."""
-        raise NotImplementedError
+    # ------------------------------------------------------- the object grid
+    def _grid(self):
+        """The object grid as ``(shape, origin)``.  With neither given, the
+        smallest grid that holds every patch.  With only the shape given,
+        a grid of that shape centered on position zero.  The origin is the
+        position, in meters, of the center of the grid's first pixel."""
+        shape, origin = self._recon['object_shape'], self._recon['object_origin']
+        if origin is None and shape is not None:
+            # A given shape with no origin: the grid is centered on position zero.
+            origin = tuple(-(n // 2) * self.sample_pixel_pitch for n in shape)
+        if origin is None:
+            first = np.round(self.probe_positions / self.sample_pixel_pitch).astype(np.int64) - self.frame_size // 2
+            origin = tuple(float(v) for v in first.min(axis=0) * self.sample_pixel_pitch)
+        if shape is None:
+            starts = self._starts(origin)
+            shape = tuple(int(v) for v in starts.max(axis=0) + self.frame_size)
+        return tuple(shape), tuple(origin)
 
-    # ---------------------------------------------------------- object grid
-    @property
-    def object_shape(self):
-        """``(rows, cols)`` of the object grid."""
-        raise NotImplementedError
+    def _starts(self, origin):
+        """The row and column of the first pixel of each patch on the grid."""
+        centers = np.round((self.probe_positions - np.asarray(origin)) / self.sample_pixel_pitch).astype(np.int64)
+        return centers - self.frame_size // 2
 
-    @property
-    def origin(self):
-        """``(row, col)`` of the grid's first pixel in metres, in the
-        coordinates of the positions."""
-        raise NotImplementedError
+    def _layout(self):
+        shape, origin = self._grid()
+        starts = self._starts(origin)
+        if starts.min() < 0 or (starts + self.frame_size > np.asarray(shape)).any():
+            raise ValueError('a patch reaches outside the object grid of shape {} with origin {} m'.format(shape, origin))
+        return Layout(self._device_list(), starts, self.frame_size, shape), starts
 
-    @property
-    def pixel_size(self):
-        """The object pixel size in metres, or None when not known."""
-        raise NotImplementedError
+    # ---------------------------------------------------------------- devices
+    def configure_devices(self, num_devices=1, devices=None):
+        """Choose the devices a reconstruction runs on.
 
-    @property
-    def overlap(self):
-        """The mean overlap fraction between neighboring probe positions,
-        as the papers define it."""
-        raise NotImplementedError
+        Without a call the model chooses automatically: every CUDA GPU,
+        else Apple's GPU (mps), else the CPU.  With several devices, the positions and the object
+        image are divided among them; see the Computing page of the design.
 
-    def auto_set_object_grid(self):
-        """Derive the object grid from the positions, the frame shape,
-        and the margin: the smallest grid holding every patch.  Called
-        by the constructor; call it again after changing the positions."""
-        raise NotImplementedError
+        Args:
+            num_devices (int, optional): the number of CUDA GPUs to use.
+                1 (the default) uses the first GPU; with no CUDA GPU,
+                Apple's GPU or the CPU.
+            devices (list, optional): the devices, for example
+                ``['cuda:0', 'cuda:2']`` or ``['cpu']``.  Overrides
+                ``num_devices``.
+        """
+        if devices is None:
+            available = torch.cuda.device_count()
+            if num_devices > 1 and num_devices > available:
+                raise ValueError('{} devices were asked for but this node has {} CUDA GPUs'.format(num_devices, available))
+            if available:
+                devices = ['cuda:{}'.format(i) for i in range(num_devices)]
+            else:
+                devices = ['mps' if torch.backends.mps.is_available() else 'cpu']
+        self._devices = [torch.device(d) for d in devices]
 
-    def scale_object_shape(self, row_scale=1.0, col_scale=1.0):
-        """Enlarge or shrink the object grid about its center."""
-        raise NotImplementedError
+    def _device_list(self):
+        if self._devices is not None:
+            return self._devices
+        count = torch.cuda.device_count()
+        if count:
+            return [torch.device('cuda:{}'.format(i)) for i in range(count)]
+        return [torch.device('mps' if torch.backends.mps.is_available() else 'cpu')]
 
-    # ------------------------------------------------------------- the probe
-    def auto_set_probe(self, scan, propagation_distance=None):
-        """Set the starting probe from the data.
+    def _batch_size(self, device):
+        if self._recon['batch_size'] is not None:
+            return int(self._recon['batch_size'])
+        if device.type == 'cuda':
+            free, _ = torch.cuda.mem_get_info(device)
+            return max(1, int(0.8 * free / (110 * self.frame_size ** 2)))
+        return max(1, 2 ** 24 // self.frame_size ** 2)      # about 2 GB of temporary arrays
 
-        The mean over positions of the back-propagated measured
-        amplitude through a constant object, then propagated by
-        ``propagation_distance`` when one is given, which adds the
-        curvature a focused probe has.  The result is recorded with
-        origin ``derived``.  :meth:`recon` calls this when the probe is
-        to be estimated and none was given.
+    # ------------------------------------------------------ the forward model
+    def _check_probe(self, probe):
+        probe = np.asarray(probe, dtype=np.complex64)
+        if probe.ndim == 2:
+            probe = probe[None]
+        if probe.shape[1:] != (self.frame_size, self.frame_size):
+            raise ValueError('the probe must be {0} x {0} pixels; got {1}'.format(self.frame_size, probe.shape))
+        return probe
+
+    def forward(self, x, d):
+        """The forward model: the amplitudes the object ``x`` and the probe
+        ``d`` give at every scan position, with no noise.
+
+        For every position, the patch of ``x`` is multiplied by each probe
+        mode and transformed to the far field, and the modes are summed in
+        intensity.
+
+        Args:
+            x (ndarray): complex ``(rows, cols)``, the object on the object
+                grid.
+            d (ndarray): complex ``(n, n)`` or ``(K, n, n)``, the probe.
+
+        Returns:
+            ndarray: float32 ``(J, n, n)``.
+        """
+        layout, starts = self._layout()
+        x = np.asarray(x, dtype=np.complex64)
+        if x.shape != layout.object_shape:
+            raise ValueError('the object must have the shape of the object grid, {}; got {}'.format(layout.object_shape, x.shape))
+        device = layout.devices[0]
+        image = torch.as_tensor(x, device=device)
+        modes = torch.as_tensor(self._check_probe(d), device=device)
+        starts = torch.as_tensor(starts, dtype=torch.int64, device=device)
+        out = np.empty((len(starts), self.frame_size, self.frame_size), dtype=np.float32)
+        step = self._batch_size(device)
+        for first in range(0, len(starts), step):
+            patches = op.gather_patches(image, starts[first:first + step], self.frame_size)
+            intensity = (op.fft2c(modes[:, None] * patches).abs() ** 2).sum(dim=0)
+            out[first:first + step] = torch.sqrt(intensity).cpu().numpy()
+        return out
+
+    def simulate(self, sample, peak_photons=None, dark_rate=0.0, seed=0):
+        """Simulate a scan of a known sample.
+
+        Args:
+            sample (Sample): the object and the probe.  Its object must have
+                the shape of the object grid and its pixel pitch must equal
+                the model's.
+            peak_photons (float, optional): the counts at the brightest
+                detector pixel.  Poisson counts are drawn from the
+                intensities scaled to this peak.  None returns the exact
+                intensities.
+            dark_rate (float, optional): the mean dark counts per pixel,
+                added as a second Poisson term.  Defaults to 0.
+            seed (int, optional): the random seed of the counts.
+
+        Returns:
+            Scan: with this model's positions and instrument facts.
+        """
+        if not np.isclose(sample.pixel_pitch, self.sample_pixel_pitch, rtol=1e-6):
+            raise ValueError('the sample has pixel pitch {:.6g} m but the model has {:.6g} m'.format(
+                sample.pixel_pitch, self.sample_pixel_pitch))
+        intensity = self.forward(sample.object, sample.probe) ** 2
+        if peak_photons is not None:
+            rng = np.random.default_rng(seed)
+            frames = rng.poisson(intensity * (peak_photons / intensity.max()))
+            if dark_rate:
+                frames = frames + rng.poisson(dark_rate, size=frames.shape)
+            intensity = frames.astype(np.float32)
+        return Scan(intensity, self.probe_positions, wavelength=self.wavelength,
+                    det_distance=self.det_distance, det_pixel_pitch=self.det_pixel_pitch)
+
+    def data_error(self, scan, x, d):
+        """The normalized root mean square difference between the scan's
+        amplitudes and :meth:`forward` of ``x`` and ``d``."""
+        y = self._amplitudes(scan)
+        predicted = self.forward(x, d)
+        return float(np.sqrt(((predicted - y) ** 2).sum(dtype=np.float64) / (y ** 2).sum(dtype=np.float64)))
+
+    def _amplitudes(self, scan):
+        if scan.frame_size != self.frame_size or scan.num_frames != len(self.probe_positions):
+            raise ValueError('the scan has {} frames of size {} but the model has {} positions and frame size {}'.format(
+                scan.num_frames, scan.frame_size, len(self.probe_positions), self.frame_size))
+        return scan.amplitudes()
+
+    def refine_probe_positions(self, scan, x, d, max_shift=1):
+        """Find, for each position, the whole-pixel shift at which the
+        forward model best matches the data.  Changes nothing: accept the
+        result with ``set_params(probe_positions=...)``.
+
+        Every shift of up to ``max_shift`` pixels along each axis is tried,
+        with the object ``x`` and the probe ``d`` held fixed.  A shift that
+        would take the patch outside the object grid is not tried.
 
         Args:
             scan (Scan): the measurement.
-            propagation_distance (float, optional): metres.
-        """
-        raise NotImplementedError
-
-    # ------------------------------------------------------- the projections
-    def forward_project(self, object, indices=None):
-        """Predict the measured amplitude at scan positions.
-
-        The nonlinear forward map: each patch of ``object`` is multiplied
-        by each probe mode, propagated to the detector, and the modes are
-        summed in intensity.
-
-        Args:
-            object (ndarray or Tensor): complex, the object grid.
-            indices (sequence of int, optional): which positions.
-                Defaults to all.
+            x, d: the current object and probe, as in :meth:`forward`.
+            max_shift (int, optional): pixels.  Defaults to 1.
 
         Returns:
-            ndarray or Tensor: float32 ``(num_positions, height, width)``,
-            the amplitude, in the form the object was given.
+            tuple: ``(probe_positions, misfit)``.  ``probe_positions`` is ``(J, 2)`` in
+            meters.  ``misfit`` is ``(J,)``: the fraction by which the best
+            shift lowers the difference from the data, 0 where the current
+            position is already the best.
         """
-        raise NotImplementedError
+        layout, starts = self._layout()
+        y = torch.as_tensor(self._amplitudes(scan))
+        device = layout.devices[0]
+        image = torch.as_tensor(np.asarray(x, dtype=np.complex64), device=device)
+        modes = torch.as_tensor(self._check_probe(d), device=device)
+        starts = torch.as_tensor(starts, dtype=torch.int64, device=device)
+        limit = torch.tensor(layout.object_shape, device=device) - self.frame_size
+        shifts = [(r, c) for r in range(-max_shift, max_shift + 1) for c in range(-max_shift, max_shift + 1)]
+        errors = torch.full((len(shifts), len(starts)), float('inf'), device=device)
+        step = self._batch_size(device)
+        for first in range(0, len(starts), step):
+            batch = slice(first, first + step)
+            measured = y[batch].to(device)
+            for i, shift in enumerate(shifts):
+                moved = starts[batch] + torch.tensor(shift, device=device)
+                inside = ((moved >= 0) & (moved <= limit)).all(dim=1)
+                patches = op.gather_patches(image, torch.where(inside[:, None], moved, starts[batch]), self.frame_size)
+                predicted = torch.sqrt((op.fft2c(modes[:, None] * patches).abs() ** 2).sum(dim=0))
+                error = torch.linalg.vector_norm(predicted - measured, dim=(-2, -1))
+                errors[i, batch] = torch.where(inside, error, torch.full_like(error, float('inf')))
+        best = errors.argmin(dim=0)
+        current = errors[shifts.index((0, 0))]
+        gain = current - errors.min(dim=0).values
+        misfit = torch.where(current > 0, gain / current, torch.zeros_like(gain)).cpu().numpy()
+        shift = torch.tensor(shifts, device=device)[best].cpu().numpy()
+        return self.probe_positions + shift * self.sample_pixel_pitch, misfit
 
-    def project_fields(self, object, indices=None):
-        """Apply the linear part of the forward model: the complex field at
-        the detector for each position and each mode.
+    # ------------------------------------------------------------ the start
+    def initial_probe(self, scan):
+        """The starting probe a reconstruction uses when none is given: the
+        mean over positions of the back-transformed amplitudes, Fresnel
+        propagated by ``probe_fresnel_radius_pixels``, then
+        smoothed.  One mode, complex64 ``(1, n, n)``."""
+        y = torch.as_tensor(self._amplitudes(scan))
+        total = torch.zeros((self.frame_size, self.frame_size), dtype=torch.complex64)
+        for first in range(0, len(y), 64):
+            total += op.ifft2c(y[first:first + 64].to(torch.complex64)).sum(dim=0)
+        probe = (total / len(y)).numpy() / (1 + 1e-6)
+        probe = fresnel_propagate(probe, self._recon['probe_fresnel_radius_pixels'])
+        probe = (gaussian_filter(probe.real, INITIAL_FILTER_SIGMA)
+                 + 1j * gaussian_filter(probe.imag, INITIAL_FILTER_SIGMA))
+        return probe.astype(np.complex64)[None]
 
-        Returns:
-            Tensor: complex ``(num_positions, modes, height, width)``.
-        """
-        raise NotImplementedError
+    def initial_object(self, scan, d):
+        """The starting object a reconstruction uses when none is given: a
+        constant patch per position, scaled by its data, averaged over the
+        grid, uncovered pixels set to the median, then smoothed.  Real
+        valued, complex64 ``(rows, cols)``."""
+        layout, starts = self._layout()
+        y = self._amplitudes(scan)
+        probe = self._check_probe(d)
+        scale = np.sqrt(np.linalg.norm(y, axis=(-2, -1)) / np.linalg.norm(probe))
+        total = np.zeros(layout.object_shape, dtype=np.complex64)
+        count = np.zeros(layout.object_shape, dtype=np.complex64)
+        n = self.frame_size
+        for (row, col), value in zip(starts, scale):
+            total[row:row + n, col:col + n] += value
+            count[row:row + n, col:col + n] += 1
+        count = count / (1 + 1e-6)
+        eps = 1e-6 * np.sqrt((np.abs(count) ** 2).sum() / count.size)
+        image = total * np.conj(count) / (np.abs(count) ** 2 + eps)
+        image[image == 0] = np.median(image)
+        return gaussian_filter(np.abs(image), INITIAL_FILTER_SIGMA).astype(np.complex64)
 
-    def back_project(self, fields, indices=None):
-        """Apply the exact adjoint of :meth:`project_fields`, from detector
-        fields onto the object grid.  Overlapping patches sum.
-
-        Returns:
-            Tensor: complex ``(rows, cols)``.
-        """
-        raise NotImplementedError
-
-    def project_to_data(self, patches, amplitude, indices=None):
-        """Replace the amplitude of the predicted fields of ``patches`` by
-        the measured ``amplitude`` and map back to patch space.
-
-        This is the per-position data-fit step every amplitude-projection
-        algorithm needs; PMACE blends it with the current patch.
-
-        Args:
-            patches (Tensor): complex ``(batch, height, width)``.
-            amplitude (Tensor): float32 ``(batch, height, width)``.
-            indices (Tensor): the positions of the batch.
-
-        Returns:
-            Tensor: complex ``(batch, height, width)``.
-        """
-        raise NotImplementedError
-
-    def gather(self, object, indices):
-        """Extract the patches of ``object`` at the positions ``indices``."""
-        raise NotImplementedError
-
-    def scatter(self, patches, indices, out=None):
-        """Add ``patches`` into an object-grid array at the positions
-        ``indices``; the adjoint of :meth:`gather`."""
-        raise NotImplementedError
-
-    def coverage(self, weight=None, indices=None):
-        """Accumulate a probe weight over the positions: the denominator
-        of the consensus average.  ``weight`` defaults to the probe
-        magnitude to the power :attr:`probe_weight_exponent` of the
-        algorithm; pass ones to count patches."""
-        raise NotImplementedError
-
-    def propagate(self, fields):
-        """Propagate exit fields from the object plane to the detector.
-        Supplied by the subclass."""
-        raise NotImplementedError
-
-    def propagate_back(self, fields):
-        """The adjoint of :meth:`propagate`.  Supplied by the subclass."""
-        raise NotImplementedError
-
-    def data_error(self, object, scan):
-        """Return the normalized root mean square error between the
-        measured amplitude and the prediction for ``object``, over the
-        whole scan, computed in batches."""
-        raise NotImplementedError
-
-    # ------------------------------------------------------- reconstruction
-    def recon(self, scan, method='pmace', iterations=100, init=None, report_every=1,
-              checkpoint_dir=None, resume='auto', algorithm=None, **method_params):
-        """Reconstruct the object, and the probe when it is estimated.
-
-        The frames are read in batches through :meth:`Scan.batches`, and
-        the algorithm's sums are accumulated across batches and reduced
-        once per pass, so a scan larger than memory reconstructs the way
-        a small one does.  The per-position state of the iteration is
-        placed on the device if it fits there, else in host memory if it
-        fits there, else in a file under ``checkpoint_dir``.  The choice
-        is printed.
-        The devices and the batch size are those set on the model, or
-        chosen automatically.
+    # -------------------------------------------------------- reconstruction
+    def recon(self, scan, probe=None, init_probe=None, init=None, iterations=100, verbose=1):
+        """Reconstruct the object, and the probe when it is not given.
 
         Args:
             scan (Scan): the measurement.  Not modified.
-            method (str, optional): ``'pmace'``.  Names the algorithm class
-                when ``algorithm`` is not given.  Defaults to ``'pmace'``.
-            iterations (int, optional): iterations to run.  This is the
-                only stopping rule.  Defaults to 100.
-            init (Reconstruction or ndarray, optional): the starting
-                object.  A previous result continues that run; an array is
-                the starting image; None initializes from the data.
-            report_every (int, optional): compute the data error every
-                this many iterations; each report costs one forward
-                projection.  Defaults to 1.
-            checkpoint_dir (str, optional): where checkpoints and any
-                file-backed state are written.  None writes none.
-            resume (str, optional): ``'auto'`` (the default) continues from
-                a checkpoint in ``checkpoint_dir`` whose parameters match
-                this call and starts fresh otherwise; ``'never'`` always
-                starts fresh.  A mismatched checkpoint is refused with the
-                difference named.
-            algorithm (object, optional): an algorithm instance such as
-                :class:`~xptycho.PMACE`, for full control of its
-                parameters.  Overrides ``method`` and ``method_params``.
-            **method_params: parameters of the named algorithm, for
-                example ``object_data_fit=0.7``.
+            probe (ndarray, optional): the known probe, held fixed.  It
+                must have all ``num_probe_modes`` modes.  None (the default)
+                means the probe is estimated.
+            init_probe (ndarray, optional): the starting probe when the
+                probe is estimated.  It may have fewer modes than
+                ``num_probe_modes``.  Defaults to :meth:`initial_probe`.
+            init (Sample, optional): start from this sample: its object,
+                and its probe when the probe is estimated and ``init_probe``
+                is not given.
+            iterations (int, optional): iterations to run.  Defaults to 100.
+            verbose (int, optional): 1 (the default) prints one line per
+                iteration; 0 prints nothing.
 
         Returns:
-            Reconstruction: the object, the probe, the coverage, the
-            positions, the curves, and the parameter table.  When the
-            probe was estimated, the model's probe is updated too.
-
-        Raises:
-            ValueError: when the probe is neither given nor estimated, or
-                the probe shape does not match the frame shape.
-            MemoryError: when the per-position state fits nowhere; the
-                message names the size and what to change.
+            Sample: the object, the probe, and ``run``, the record of the run.
         """
-        raise NotImplementedError
+        start_time = time.time()
+        y = self._amplitudes(scan)
+        estimate = probe is None
+        if not estimate:
+            modes = self._check_probe(probe)
+            if len(modes) != self.num_probe_modes:
+                raise ValueError('the given probe has {} modes but the model has num_probe_modes={}'.format(len(modes), self.num_probe_modes))
+        elif init_probe is not None:
+            modes = self._check_probe(init_probe)
+        elif init is not None:
+            modes = self._check_probe(init.probe)
+        else:
+            modes = self.initial_probe(scan)
 
-    def recon_direct(self, scan):
-        """Return the data-driven starting object: each patch set to the
-        norm of its measurement over the norm of the probe, averaged into
-        the grid, and smoothed.  This is what :meth:`recon` starts from
-        when no ``init`` is given.
+        schedule = sorted(int(i) for i in self._recon['mode_schedule'])
+        if estimate:
+            schedule = schedule[:self.num_probe_modes - len(modes)]
+            if len(modes) + len(schedule) != self.num_probe_modes:
+                raise ValueError('the probe starts with {} modes and must reach num_probe_modes={}, so mode_schedule needs {} '
+                                 'iterations; it is {}'.format(
+                                     len(modes), self.num_probe_modes, self.num_probe_modes - len(modes),
+                                     list(self._recon['mode_schedule'])))
 
-        Returns:
-            ndarray: complex64 on the object grid.
-        """
-        raise NotImplementedError
+        if init is not None:
+            start_object = np.asarray(init.object if hasattr(init, 'object') else init, dtype=np.complex64)
+        else:
+            start_object = self.initial_object(scan, modes)
 
-    # -------------------------------------------------------------- compute
-    def configure_devices(self, num_devices=None, devices=None):
-        """Choose the devices a reconstruction runs on.
+        layout, starts = self._layout()
+        if start_object.shape != layout.object_shape:
+            raise ValueError('the starting object must have the shape of the object grid, {}; got {}'.format(
+                layout.object_shape, start_object.shape))
+        batch = min(self._batch_size(d) for d in layout.devices)
+        run = Run(layout, starts, y, modes, start_object, dict(self._recon), estimate, batch)
+        if verbose:
+            print('devices: {}   batch {}   positions {}   object {} x {}'.format(
+                ' '.join(str(d) for d in layout.devices), batch, len(starts), *layout.object_shape))
 
-        With several CUDA devices on one node the scan positions are
-        split across them, contiguously in a spatially local order, and
-        the algorithm's sums are reduced once per pass.  One process
-        drives all devices.  Defaults to every CUDA device present, else
-        the CPU.
+        errors = []
+        for iteration in range(1, iterations + 1):
+            run.update_object()         # the most important line: one PMACE update of the object
+            if estimate:
+                if iteration in schedule:
+                    run.add_mode(self._recon['probe_fresnel_radius_pixels'])
+                    if self._recon['orthogonalize_modes']:
+                        run.orthogonalize_modes()
+                    if verbose:
+                        print('iteration {}: mode {} added, {:g}% of the energy'.format(
+                            iteration, len(run.modes), 100 * self._recon['mode_energy_fraction']))
+                run.update_probe()
+            errors.append(run.data_error())
+            if verbose:
+                print('iteration {:4d}   data error {:.6f}   modes {}'.format(iteration, errors[-1], len(run.modes)))
 
-        Args:
-            num_devices (int, optional): use this many of the visible
-                devices.
-            devices (list of str, optional): the devices, for example
-                ``['cuda:0', 'cuda:1']``.
-        """
-        raise NotImplementedError
-
-    def estimate_memory(self, scan):
-        """Return the bytes each large array of a reconstruction of
-        ``scan`` needs and where it would be placed, before anything is
-        allocated."""
-        raise NotImplementedError
-
-
-class FarFieldModel(PtychographyModel):
-    """The far-field (Fraunhofer) ptychography model of the PMACE papers.
-
-    Propagation from the object plane to the detector is the orthonormal
-    centered two-dimensional Fourier transform, and the object pixel
-    size follows from ``wavelength * detector_distance / (frame_size *
-    detector_pixel)``, recorded with origin ``derived``.
-
-    See :class:`PtychographyModel` for the arguments and methods.
-    """
-
-    def propagate(self, fields):
-        """The orthonormal centered FFT over the last two axes."""
-        raise NotImplementedError
-
-    def propagate_back(self, fields):
-        """The inverse orthonormal centered FFT."""
-        raise NotImplementedError
+        params = self.parameters()
+        params.append(dict(name='iterations', value=iterations, units='', origin='given'))
+        params.append(dict(name='probe', value='estimated' if estimate else 'given', units='', origin='given'))
+        params.append(dict(name='seconds', value=round(time.time() - start_time, 3), units='s', origin='derived'))
+        _, origin = self._grid()
+        record = RunRecord(params, errors, iterations, self.probe_positions.copy(), run.coverage_map())
+        return Sample(run.object(), run.probe(), self.sample_pixel_pitch, origin, scan.name, record)

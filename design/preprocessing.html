@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>xptycho Preprocessing</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one reading column; the scripts a user writes, one per use, then every public name in one table. Colors match the theory page. */
+:root {
+  --bg: #fbfaf7; --surface: #ffffff; --fg: #1f2328; --muted: #5f6670; --line: #d9d7d0;
+  --data: #b7791f; --fm: #0b7285; --unk: #2b6cb0; --par: #2f855a; --state: #6b46c1; --comp: #718096; --accent: #2b6cb0;
+  --sans: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+  --mono: "IBM Plex Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #15171b; --surface: #1d2025; --fg: #e6e4df; --muted: #a0a6ae; --line: #343a42;
+  --data: #e2b05a; --fm: #5ec8d8; --unk: #7fb0ea; --par: #7cc99a; --state: #b59cf0; --comp: #a7b0bd; --accent: #7fb0ea; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #15171b; --surface: #1d2025; --fg: #e6e4df; --muted: #a0a6ae; --line: #343a42;
+  --data: #e2b05a; --fm: #5ec8d8; --unk: #7fb0ea; --par: #7cc99a; --state: #b59cf0; --comp: #a7b0bd; --accent: #7fb0ea; color-scheme: dark }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--sans); font-size: 16px; line-height: 1.55; }
+.wrap { max-width: 920px; margin: 0 auto; padding-inline: 16px; padding-block: 28px 64px; }
+.crumb { font-size: 13px; color: var(--muted); margin: 0 0 14px; }
+.crumb a { color: var(--accent); text-decoration: none; }
+h1 { font-size: 30px; font-weight: 700; margin: 0 0 4px; }
+h2 { font-size: 22px; font-weight: 700; margin: 44px 0 10px; }
+h3 { font-size: 17px; font-weight: 700; margin: 24px 0 4px; }
+p { max-width: 70ch; margin: 0 0 10px; }
+.lead { color: var(--muted); font-size: 17px; }
+code { font-family: var(--mono); font-size: 0.9em; }
+a { color: var(--accent); }
+pre { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 10px 14px; font-family: var(--mono); font-size: 13px; line-height: 1.55; overflow-x: auto; margin: 8px 0 6px; }
+pre .c { color: var(--muted); }
+.note { font-size: 14px; color: var(--muted); max-width: 76ch; margin: 0 0 8px; }
+.frame { overflow-x: auto; }
+table.t { border-collapse: collapse; margin: 10px 0; font-size: 14px; width: 100%; }
+table.t th, table.t td { border-bottom: 1px solid var(--line); padding: 5px 12px 5px 0; text-align: left; vertical-align: top; }
+table.t th { font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+table.t td:first-child { font-family: var(--mono); font-size: 13px; white-space: nowrap; }
+.kind { font-size: 11.5px; font-weight: 600; padding: 0 7px; border-radius: 10px; border: 1px solid; white-space: nowrap; }
+.k-fm { color: var(--fm); border-color: var(--fm); } .k-par { color: var(--par); border-color: var(--par); } .k-comp { color: var(--comp); border-color: var(--comp); }
+.ask { border-left: 4px solid var(--unk); background: var(--surface); padding: 12px 16px; max-width: 78ch; margin: 16px 0; }
+.ask ol { margin: 6px 0 0; padding-left: 22px; }
+.ask li { margin: 6px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+<p class="crumb"><a href="index.html">xptycho design</a> &rsaquo; Preprocessing</p>
+<h1>Preprocessing</h1>
+<p class="lead">How raw detector frames become a <code>Scan</code>. The steps are those Qiuchen Zhai used for the gold-ball data in the two TCI papers, read from her script in <code>ptycho_pmace_papers</code>. Each step is a function of arrays in memory; one reader per file format does the file reading. Section 4 lists what was checked against her data, and section 5 gives notes on the design.</p>
+
+<h2>1. The goal</h2>
+<p>Take the raw file of an instrument to a <code>Scan</code>: frames that are intensities, centered so that zero frequency is at pixel \((N_p/2, N_p/2)\), with positions in meters and the instrument facts. The first test is to reproduce the frames the reference code reconstructs.</p>
+
+<h2>2. The script</h2>
+<pre>import xptycho as xpt
+import xptycho.preprocess as xpp
+
+raw = xpp.cxi.load_raw(xpt.download(RAW_URL, DATA_DIR))       <span class="c"># counts, dark frames, translations, instrument facts</span>
+
+frames = xpp.subtract_dark(raw['frames'], raw['dark_frames'])  <span class="c"># 1. mean dark frame off; negatives to zero</span>
+
+outlier = xpp.find_outlier_frames(frames, threshold=2)         <span class="c"># 2. frames whose mean intensity is an outlier</span>
+frames, translations = frames[~outlier], raw['translations'][~outlier]
+
+center = xpp.diffraction_center(frames)                        <span class="c"># 3. one center for the whole scan</span>
+frames = xpp.crop_frames(frames, center, 512)
+
+frames = frames * xpp.tukey_window(512, 0.5) ** 2              <span class="c"># 4. taper; the window multiplies amplitudes</span>
+
+probe_positions = translations[:, [1, 0]]                            <span class="c"># as recorded: rows along y, columns along x</span>
+scan = xpt.Scan(frames, probe_positions, wavelength=raw['wavelength'],
+                det_distance=raw['det_distance'], det_pixel_pitch=raw['det_pixel_pitch'])</pre>
+<p class="note">Every intermediate is an array the user can look at. No step reads or writes a file except <code>load_raw</code> and <code>download</code>.</p>
+
+<h2>3. The functions</h2>
+<div class="frame">
+<table class="t">
+  <tr><th>name</th><th>what it does</th></tr>
+  <tr><td>preprocess.cxi.load_raw(path)</td><td>Reads a CXI file (the HDF5 format of the Coherent X-ray Imaging Data Bank). Returns the detector counts, the dark frames, the recorded translations \((x, y, z)\) in meters, the wavelength from the recorded photon energy, the detector distance, and the detector pitch. Corrects nothing.</td></tr>
+  <tr><td>preprocess.subtract_dark(frames, dark_frames)</td><td>Subtracts the mean of the dark frames from every frame and sets negative values to zero.</td></tr>
+  <tr><td>preprocess.find_outlier_frames(frames, threshold=2)</td><td>Computes the mean intensity of each frame. A frame is an outlier when its mean is more than <code>threshold</code> standard deviations from the average of the means. Returns one True or False per frame; the user removes the frames and their positions.</td></tr>
+  <tr><td>preprocess.diffraction_center(frames)</td><td>The intensity center of mass of the mean frame: one \((\text{row}, \text{col})\) for the whole scan.</td></tr>
+  <tr><td>preprocess.crop_frames(frames, center, size)</td><td>Cuts a <code>size</code> by <code>size</code> square out of every frame with <code>center</code>, rounded to whole pixels, at pixel \((\text{size}/2, \text{size}/2)\).</td></tr>
+  <tr><td>preprocess.tukey_window(size, shape=0.5)</td><td>A circular window: 1 in the middle, tapering to 0 at radius <code>size</code>/2, made by rotating a 1-D Tukey window. It multiplies amplitudes, so intensities are multiplied by its square.</td></tr>
+</table>
+</div>
+<p class="note">A new instrument format gets its own reader module beside <code>cxi</code>. The general steps do not change. This is the layout of mbirtorch's <code>preprocess</code> package: general functions, and one module per instrument.</p>
+
+<h2>4. Checked against the reference data</h2>
+<p>The raw file is the gold-ball scan, 800 frames of 621 by 621 and 20 dark frames. The reference is the 794 preprocessed frames of 512 by 512 distributed with <code>ptycho_pmace</code>.</p>
+<div class="frame">
+<table class="t">
+  <tr><th>step</th><th>result on the raw gold-ball file</th></tr>
+  <tr><td>outlier frames</td><td>Frames 581, 648, 649, 723, 763, 764 are removed. These are the six frames absent from the reference data.</td></tr>
+  <tr><td>center</td><td>The center of mass of the mean frame is (308.63, 295.18). Rounded, (309, 295), it gives the crop rows 53 to 564 and columns 39 to 550, the crop written by hand in the reference script.</td></tr>
+  <tr><td>frames</td><td>All 794 frames equal the reference frames to rounding: the largest difference is 0.0002 counts, of a largest count of 65,244.</td></tr>
+  <tr><td>window</td><td>Equal to the reference window to rounding (\(3 \times 10^{-8}\)).</td></tr>
+  <tr><td>reconstruction</td><td>With the known probe and these frames, 100 iterations end at data error 0.0906. On the reference frames and positions the same run ends at 0.090721, equal to the reference code, and the object differs from the reference code's by \(3 \times 10^{-6}\).</td></tr>
+</table>
+</div>
+
+<h2>5. Notes</h2>
+<div class="ask">
+  <ol>
+    <li><b>The definition of the center.</b> The center of mass of the mean frame reproduces the hand-chosen crop on this data. It is one center for all frames. A center per frame would be wrong: the center of mass of a single frame moves with the phase gradient of the object under the probe, so centering each frame would remove real signal. The fractional part of the center (0.37 and 0.18 pixel here) is dropped by the whole-pixel crop.</li>
+    <li><b>Positions.</b> The reference data carries positions that were refined with another program and rounded to whole pixels; they differ from the recorded ones by up to 3 pixels. The script above uses the recorded positions as recorded, with rows along \(y\) and columns along \(x\); the object then has the orientation of the SEM image supplied with the data set. This is written in the script, not in the reader.</li>
+    <li><b>Saturated pixels.</b> About 90 pixels per frame are at the detector's largest count, 65535. The reference preprocessing does nothing about them, and neither does this.</li>
+    <li><b>The blind gold-ball experiment of the 2025 paper.</b> Its script estimates the probe from one mode, adds a second at iteration 10, and at that iteration also replaces the modes by an orthogonal set (a singular value decomposition). The paper also refines the positions during the run. xptycho has the orthogonalization step (<code>orthogonalize_modes</code>), and demo 3 uses it.</li>
+    <li><b>Dataset names inside a CXI file.</b> <code>load_raw</code> uses the standard CXI names (<code>entry_1/instrument_1/detector_1/data</code> and so on). They are fixed in the reader, as the names of the format it reads.</li>
+  </ol>
+</div>
+
+<h2>Data</h2>
+<ul class="refs">
+  <li>Stefano Marchesini et al., "Ptychography Gold Ball Example Dataset," Coherent X-ray Imaging Data Bank, <a href="https://www.cxidb.org/id-65.html">CXIDB ID 65</a>, 2017. <a href="https://doi.org/10.11577/1454414">doi:10.11577/1454414</a>. Collected at beamline 5.3.2.1 of the Advanced Light Source; released under the CC0 public domain dedication.</li>
+</ul>
+</div>
+<script>
+window.MathJax = { tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] }, svg: { fontCache: 'global' } };
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-svg.js"></script>
+</body>
+</html>
