@@ -20,7 +20,7 @@ RECON_DEFAULTS = {
     'mode_schedule': ((), 'iterations'),
     'mode_energy_fraction': (0.05, ''),
     'orthogonalize_modes': (False, ''),
-    'initial_probe_distance': (None, 'm'),
+    'probe_fresnel_radius_pixels': (0.0, 'pixels'),
     'object_shape': (None, 'pixels'),
     'object_origin': (None, 'm'),
     'batch_size': (None, 'positions'),
@@ -366,16 +366,14 @@ class PtychoModel:
     def initial_probe(self, scan):
         """The starting probe a reconstruction uses when none is given: the
         mean over positions of the back-transformed amplitudes, Fresnel
-        propagated by ``initial_probe_distance`` when it is set, then
+        propagated by ``probe_fresnel_radius_pixels``, then
         smoothed.  One mode, complex64 ``(1, n, n)``."""
         y = torch.as_tensor(self._amplitudes(scan))
         total = torch.zeros((self.frame_size, self.frame_size), dtype=torch.complex64)
         for first in range(0, len(y), 64):
             total += op.ifft2c(y[first:first + 64].to(torch.complex64)).sum(dim=0)
         probe = (total / len(y)).numpy() / (1 + 1e-6)
-        distance = self._recon['initial_probe_distance']
-        if distance is not None:
-            probe = fresnel_propagate(probe, self.wavelength, distance, self.sample_pixel_pitch)
+        probe = fresnel_propagate(probe, self._recon['probe_fresnel_radius_pixels'])
         probe = (gaussian_filter(probe.real, INITIAL_FILTER_SIGMA)
                  + 1j * gaussian_filter(probe.imag, INITIAL_FILTER_SIGMA))
         return probe.astype(np.complex64)[None]
@@ -445,8 +443,6 @@ class PtychoModel:
                                  'iterations; it is {}'.format(
                                      len(modes), self.num_probe_modes, self.num_probe_modes - len(modes),
                                      list(self._recon['mode_schedule'])))
-            if schedule and self._recon['initial_probe_distance'] is None:
-                raise ValueError('adding a probe mode needs initial_probe_distance to be set')
 
         if init is not None:
             start_object = np.asarray(init.object if hasattr(init, 'object') else init, dtype=np.complex64)
@@ -468,7 +464,7 @@ class PtychoModel:
             run.update_object()         # the most important line: one PMACE update of the object
             if estimate:
                 if iteration in schedule:
-                    run.add_mode(self.wavelength, self._recon['initial_probe_distance'], self.sample_pixel_pitch)
+                    run.add_mode(self._recon['probe_fresnel_radius_pixels'])
                     if self._recon['orthogonalize_modes']:
                         run.orthogonalize_modes()
                     if verbose:

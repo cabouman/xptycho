@@ -55,7 +55,7 @@ RELAXATION = 0.5                # rho
 MODE_SCHEDULE = [10]            # the iteration at which the second mode is added
 MODE_ENERGY_FRACTION = 0.05     # the share of the probe energy the new mode starts with
 ORTHOGONALIZE_MODES = True      # make the modes orthogonal when a mode is added
-MODE_DISTANCE = 9e-7            # m, Fresnel propagation of a new mode
+PROBE_FRESNEL_RADIUS_PIXELS = 2.5   # Fresnel propagation of the starting probe and of a new mode
 
 # The part of the object to view: first and last row, first and last column.
 # This is 400 x 400 pixels about the center of the scan.
@@ -99,17 +99,14 @@ xpt.save_figures(xpt.view_scan(scan), OUTPUT_DIR)          # one frame and the s
 # The model takes the instrument facts and the positions from the scan.
 model = xpt.PtychoModel.from_scan(scan, num_probe_modes=NUM_PROBE_MODES)
 
-# The starting probe: one mode computed from the data, with no Fresnel propagation.
-init_probe = model.initial_probe(scan)
-
 model.set_params(object_data_fit=OBJECT_DATA_FIT, probe_data_fit=PROBE_DATA_FIT,
                  probe_weight_exponent=PROBE_WEIGHT_EXPONENT, relaxation=RELAXATION,
                  mode_schedule=MODE_SCHEDULE, mode_energy_fraction=MODE_ENERGY_FRACTION,
-                 orthogonalize_modes=ORTHOGONALIZE_MODES, initial_probe_distance=MODE_DISTANCE)
+                 orthogonalize_modes=ORTHOGONALIZE_MODES, probe_fresnel_radius_pixels=PROBE_FRESNEL_RADIUS_PIXELS)
 model.print_params()
 
 # The most important line: PMACE with no probe given, so the probe is estimated.
-recon = model.recon(scan, init_probe=init_probe, iterations=ITERATIONS)
+recon = model.recon(scan, iterations=ITERATIONS)
 
 print(recon.summary())
 recon.save(OUTPUT_DIR + '/recon.h5')          # the object, the probe, and the record of the run

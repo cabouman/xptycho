@@ -79,16 +79,16 @@ If you have a good guess, pass it as the starting point and it is refined::
     recon = model.recon(scan, init_probe=my_guess, iterations=100)
 
 **The starting probe.**  With no probe given, the starting probe is computed from the
-data.  Setting ``initial_probe_distance`` propagates it that many meters, which gives it
-the curvature of a focused beam and usually helps::
+data.  Setting ``probe_fresnel_radius_pixels`` Fresnel propagates it, spreading each point over
+that radius in pixels, which gives it the curvature of a focused beam and usually helps::
 
-    model.set_params(initial_probe_distance=2e-6)
+    model.set_params(probe_fresnel_radius_pixels=22)
 
 **Several probe modes.**  A partially coherent beam needs more than one mode.  Say how many
 when you build the model, and at which iterations each extra mode is added::
 
     model = xpt.PtychoModel.from_scan(scan, num_probe_modes=2)
-    model.set_params(mode_schedule=[20], initial_probe_distance=2e-6)
+    model.set_params(mode_schedule=[20], probe_fresnel_radius_pixels=22)
     recon = model.recon(scan, iterations=200)
     print(recon.mode_energies)                    # the share of the energy in each mode
 

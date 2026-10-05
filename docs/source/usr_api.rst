@@ -15,7 +15,7 @@ record of the run.  A ground truth is also a :class:`~xptycho.Sample`.  The desi
 
     scan = xpt.Scan.load('scan.h5')
     model = xpt.PtychoModel.from_scan(scan, num_probe_modes=2)
-    model.set_params(object_data_fit=0.5, mode_schedule=[20], initial_probe_distance=0.3e-6)
+    model.set_params(object_data_fit=0.5, mode_schedule=[20], probe_fresnel_radius_pixels=22)
     recon = model.recon(scan, iterations=200)        # probe not given, so estimated
 
     print(recon.summary())
@@ -66,10 +66,12 @@ Set with :meth:`~xptycho.PtychoModel.set_params`, read with
    * - ``orthogonalize_modes``
      - off
      - Replace the modes by an orthogonal set each time a mode is added.
-   * - ``initial_probe_distance``
-     - none
-     - Meters.  The Fresnel propagation distance used in computing the starting probe and a
-       new mode.  None means no propagation.
+   * - ``probe_fresnel_radius_pixels``
+     - 0
+     - Pixels.  The starting probe and each new mode are Fresnel propagated, and this is the
+       radius over which the propagation spreads each point of the field.  0 means no
+       propagation.  For a propagation distance z it equals sqrt(wavelength * z) /
+       ``sample_pixel_pitch``.
    * - ``object_shape``
      - from the positions
      - The rows and columns of the object grid.  By default the smallest grid that holds

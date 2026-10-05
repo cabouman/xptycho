@@ -37,7 +37,7 @@ PROBE_WEIGHT_EXPONENT = 1.25    # kappa
 RELAXATION = 0.5                # rho
 MODE_SCHEDULE = [20]            # the iteration at which the second mode is added
 MODE_ENERGY_FRACTION = 0.1      # the share of the probe energy the new mode starts with
-INITIAL_PROBE_DISTANCE = 2e-6   # m, Fresnel propagation of the starting probe and of a new mode
+PROBE_FRESNEL_RADIUS_PIXELS = 22.05   # Fresnel propagation of the starting probe and of a new mode
 
 # The ground truth, one HDF5 file holding a sample (an object and its probe).
 TRUTH_URL = 'https://www.datadepot.rcac.purdue.edu/bouman/data/demo_xptycho_blind.h5'
@@ -68,7 +68,7 @@ xpt.save_figures(xpt.view_scan(scan), OUTPUT_DIR)          # one frame and the s
 model.set_params(object_data_fit=OBJECT_DATA_FIT, probe_data_fit=PROBE_DATA_FIT,
                  probe_weight_exponent=PROBE_WEIGHT_EXPONENT, relaxation=RELAXATION,
                  mode_schedule=MODE_SCHEDULE, mode_energy_fraction=MODE_ENERGY_FRACTION,
-                 initial_probe_distance=INITIAL_PROBE_DISTANCE)
+                 probe_fresnel_radius_pixels=PROBE_FRESNEL_RADIUS_PIXELS)
 model.print_params()
 
 # The most important line: PMACE with no probe given, so the probe is estimated.

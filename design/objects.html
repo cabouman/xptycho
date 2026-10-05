@@ -165,7 +165,7 @@ table.where th { font-size: 12px; letter-spacing: 0.06em; text-transform: upperc
         <li><code>object_data_fit</code> \(\alpha_1\), <code>probe_data_fit</code> \(\alpha_2\)</li>
         <li><code>probe_weight_exponent</code> \(\kappa\), <code>relaxation</code> \(\rho\)</li>
         <li><code>mode_schedule</code>, <code>mode_energy_fraction</code></li>
-        <li><code>initial_probe_distance</code></li>
+        <li><code>probe_fresnel_radius_pixels</code></li>
         <li>object grid shape (must hold every patch)</li>
       </ul>
     </div>
@@ -306,7 +306,7 @@ recon.save(OUTPUT_DIR + '/recon.h5')
 scan = xpt.Scan.load('gold_balls.h5')
 model = xpt.PtychoModel.from_scan(scan, num_probe_modes=2)             <span class="c"># fmodel_params from the file</span>
 model.set_params(object_data_fit=0.5, probe_data_fit=0.6, mode_schedule=[20],
-                 initial_probe_distance=0.3e-6)
+                 probe_fresnel_radius_pixels=22)
 model.configure_devices(num_devices=4, batch_size=512)
 recon = model.recon(scan, iterations=200)                         <span class="c"># probe not given, so estimated</span>
 recon.probe                                                       <span class="c"># (2, h, w)</span>

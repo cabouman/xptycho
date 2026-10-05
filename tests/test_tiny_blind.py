@@ -20,8 +20,9 @@ def setup(devices):
     model = make_model(devices, object_data_fit=BASELINE['obj_data_fit_prm'],
                        probe_data_fit=BASELINE['probe_data_fit_prm'], relaxation=BASELINE['rho'],
                        probe_weight_exponent=BASELINE['probe_exp'], mode_schedule=BASELINE['add_mode'],
-                       mode_energy_fraction=BASELINE['energy_ratio'],
-                       initial_probe_distance=BASELINE['propagation_dist'])
+                       mode_energy_fraction=BASELINE['energy_ratio'])
+    model.set_params(probe_fresnel_radius_pixels=np.sqrt(model.wavelength * BASELINE['propagation_dist'])
+                     / model.sample_pixel_pitch)
     model.num_probe_modes = 2
     return model, model.simulate(xpt.Sample(truth, modes, PIXEL_PITCH)), truth
 

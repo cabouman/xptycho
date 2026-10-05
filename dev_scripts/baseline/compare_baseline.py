@@ -68,7 +68,8 @@ def main():
     if blind:
         model.set_params(probe_data_fit=params['probe_data_fit_prm'], mode_schedule=params.get('add_mode', []),
                          mode_energy_fraction=params.get('energy_ratio', 0.05),
-                         initial_probe_distance=params.get('propagation_dist'))
+                         probe_fresnel_radius_pixels=np.sqrt(model.wavelength * params.get('propagation_dist', 0.0))
+                         / model.sample_pixel_pitch)
     if DEVICES:
         model.configure_devices(devices=DEVICES)
 
@@ -88,7 +89,7 @@ def main():
         run.update_object()
         if blind:
             if iteration in schedule:
-                run.add_mode(model.wavelength, model._recon['initial_probe_distance'], model.sample_pixel_pitch)
+                run.add_mode(model._recon['probe_fresnel_radius_pixels'])
                 if iteration in params.get('orthogonalize_modes', []):
                     run.orthogonalize_modes()
             run.update_probe()

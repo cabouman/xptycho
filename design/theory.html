@@ -123,7 +123,7 @@ table.params th { font-size: 12px; letter-spacing: 0.06em; text-transform: upper
       <li>\(\rho \in (0,1)\): the Mann step.</li>
       <li>The number of iterations.</li>
       <li>The mode schedule: the iterations at which a new mode is added, and the energy fraction \(f\) a new mode gets (section 5).</li>
-      <li>The Fresnel propagation distance used to initialize the probe and to add a mode (sections 4 and 5).</li>
+      <li>The Fresnel radius used to initialize the probe and to add a mode (sections 4 and 5).</li>
       <li>The object grid: its shape, which must hold every patch. The counterpart of <code>recon_shape</code> in mbirtorch.</li>
       <li>(\(\varepsilon\) in a stable inverse is a fixed formula, \(10^{-6}\sqrt{\|a\|^2/\dim a}\) for the array \(a\) being inverted, not a choice.)</li>
     </ul>
@@ -241,7 +241,7 @@ table.params th { font-size: 12px; letter-spacing: 0.06em; text-transform: upper
   <tr><td><code>probe_weight_exponent</code></td><td>\(\kappa\)</td><td>exponent on the probe magnitude in the averaging weights</td></tr>
   <tr><td><code>relaxation</code></td><td>\(\rho\)</td><td>Mann step</td></tr>
   <tr><td><code>mode_schedule</code></td><td></td><td>the iterations at which a mode is added (section 5)</td></tr>
-  <tr><td><code>initial_probe_distance</code></td><td>\(z\)</td><td>Fresnel propagation distance in the probe initialization and in adding a mode (sections 4 and 5)</td></tr>
+  <tr><td><code>probe_fresnel_radius_pixels</code></td><td>\(\sqrt{\lambda z}/\Delta_x\)</td><td>The radius, in pixels, over which the Fresnel propagation of distance \(z\) spreads each point of the field, in the probe initialization and in adding a mode (sections 4 and 5); 0 means no propagation</td></tr>
   <tr><td><code>num_probe_modes</code></td><td>\(K\)</td><td>number of probe modes (a forward-model parameter; the rest of this table are reconstruction parameters)</td></tr>
   <tr><td><code>mode_energy_fraction</code></td><td>\(f\)</td><td>fraction of the probe energy given to a newly added mode (section 5; 0.05)</td></tr>
   <tr><td><code>orthogonalize_modes</code></td><td></td><td>make the modes orthogonal each time a mode is added (section 5; off)</td></tr>

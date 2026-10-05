@@ -16,13 +16,15 @@ OUTLIER_THRESHOLD = 1.5       # on the modified z-score of a probe copy
 OUTLIER_SCALE = 0.6745
 
 
-def fresnel_propagate(field, wavelength, distance, pixel_pitch):
-    """Propagate a square complex field a distance, by the Fresnel
-    transfer function.  numpy, on the host; the field is probe-sized."""
+def fresnel_propagate(field, fresnel_radius_pixels):
+    """Fresnel propagate a square complex field.  ``fresnel_radius_pixels``
+    is the radius over which each point of the field is spread; it equals
+    sqrt(wavelength * distance) / pixel_pitch for a propagation distance,
+    and 0 returns the field.  numpy, on the host; the field is probe-sized."""
     n = field.shape[0]
-    f = np.fft.fftfreq(n, d=pixel_pitch)
+    f = np.fft.fftfreq(n)                # cycles per pixel
     fx, fy = np.meshgrid(f, f, indexing='ij')
-    transfer = np.exp(-1j * np.pi * wavelength * distance * (fx ** 2 + fy ** 2))
+    transfer = np.exp(-1j * np.pi * fresnel_radius_pixels ** 2 * (fx ** 2 + fy ** 2))
     return np.fft.ifft2(np.fft.fft2(field) * transfer)
 
 
@@ -218,7 +220,7 @@ class Run:
             self.s[g] = torch.where(score > OUTLIER_THRESHOLD, center, self.s[g])
         self._set_modes(modes)
 
-    def add_mode(self, wavelength, distance, pixel_pitch):
+    def add_mode(self, fresnel_radius_pixels):
         """Step 3: add a probe mode from the intensity the current modes do
         not explain, and rescale every mode and every copy."""
         fraction = self.params['mode_energy_fraction']
@@ -234,7 +236,7 @@ class Run:
                 total += op.stable_divide(op.ifft2c(residual.to(torch.complex64)), p, patch_eps[g]).sum(dim=0)
             sums.append(total)
         mean = (self.layout.sum_small(sums) / self.num_positions).cpu().numpy()
-        new = fresnel_propagate(mean, wavelength, distance, pixel_pitch)
+        new = fresnel_propagate(mean, fresnel_radius_pixels)
         energy = float((self.modes.abs() ** 2).sum())
         new = new * (np.sqrt(fraction * energy) / np.linalg.norm(new))
         new = torch.as_tensor(new.astype(np.complex64), device=self.modes.device)

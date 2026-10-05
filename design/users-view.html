@@ -87,7 +87,7 @@ scan.save('goldballs.h5')
 scan = xpt.Scan.load('goldballs.h5')
 model = xpt.PtychoModel.from_scan(scan, num_probe_modes=2)
 model.set_params(object_data_fit=0.5, probe_data_fit=0.6, probe_weight_exponent=1.25,
-                 relaxation=0.5, mode_schedule=[20], initial_probe_distance=0.3e-6)
+                 relaxation=0.5, mode_schedule=[20], probe_fresnel_radius_pixels=22)
 recon = model.recon(scan, iterations=200)                            <span class="c"># probe not given: estimated</span>
 xpt.view_sample(recon, region=VIEW_REGION); recon.save('./output/goldballs/recon.h5')</pre>
 
@@ -140,7 +140,7 @@ print(model.data_error(scan, recon.object, recon.probe))</pre>
   <tr><td>mode_schedule</td><td><span class="kind k-par">recon</span></td><td>iterations at which a mode is added; default none</td></tr>
   <tr><td>mode_energy_fraction</td><td><span class="kind k-par">recon</span></td><td>\(f\); default 0.05</td></tr>
   <tr><td>orthogonalize_modes</td><td><span class="kind k-par">recon</span></td><td>make the modes orthogonal each time a mode is added; default off</td></tr>
-  <tr><td>initial_probe_distance</td><td><span class="kind k-par">recon</span></td><td>Fresnel distance for the initial probe and new modes, meters; default none (no propagation)</td></tr>
+  <tr><td>probe_fresnel_radius_pixels</td><td><span class="kind k-par">recon</span></td><td>The radius, in pixels, over which Fresnel propagation spreads each point of the initial probe and of a new mode; default 0 (no propagation)</td></tr>
   <tr><td>num_devices, devices</td><td><span class="kind k-comp">compute_params</span></td><td>arguments of <code>configure_devices</code>: how many GPUs, or which; see <a href="computing.html">Computing</a>, section 4</td></tr>
 </table>
 </div>
