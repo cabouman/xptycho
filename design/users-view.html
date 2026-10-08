@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>xptycho User's View</title>
+<title>xptycho User API</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap">
 <style>
-/* Layout: one reading column; the scripts a user writes, one per use, then every public name in one table. Colors match the theory page. */
+/* Layout: one reading column; the scripts a user writes, one per use, then every public name in one table. Colors match the algorithm page. */
 :root {
   --bg: #fbfaf7; --surface: #ffffff; --fg: #1f2328; --muted: #5f6670; --line: #d9d7d0;
   --data: #b7791f; --fm: #0b7285; --unk: #2b6cb0; --par: #2f855a; --state: #6b46c1; --comp: #718096; --accent: #2b6cb0;
@@ -47,9 +47,9 @@ table.t td:first-child { font-family: var(--mono); font-size: 13px; white-space:
 </head>
 <body>
 <div class="wrap">
-<p class="crumb"><a href="index.html">xptycho design</a> &rsaquo; The user's view</p>
-<h1>The User's View</h1>
-<p class="lead">The scripts a user writes, one per use, and every public name in one place. The three objects are those of the <a href="objects.html">objects page</a>; the helper functions and the <code>Scan</code> methods are listed here. The scripts follow the three demos in <code>demo/</code>.</p>
+<p class="crumb"><a href="index.html">xptycho design</a> &rsaquo; User API</p>
+<h1>User API</h1>
+<p class="lead">The scripts a user writes, one per use, and every public name in one place. The three objects are those of the <a href="objects.html">software architecture page</a>; the helper functions and the <code>Scan</code> methods are listed here. The scripts follow the three demos in <code>demo/</code>.</p>
 
 <h2>1. The scripts</h2>
 
@@ -141,14 +141,14 @@ print(model.data_error(scan, recon.object, recon.probe))</pre>
 <table class="t">
   <tr><th>name</th><th>what it is</th></tr>
   <tr><td>Scan(frames, probe_positions, *, wavelength or energy, det_distance, det_pixel_pitch, name)</td><td>the measurement: frames (intensities), recorded positions, instrument facts. <code>Scan.load(path)</code>, <code>scan.save(path)</code>, <code>scan.summary()</code>, <code>scan.amplitudes()</code>, <code>scan.frames</code>, <code>scan.probe_positions</code>, <code>scan.wavelength</code>, <code>scan.det_distance</code>, <code>scan.det_pixel_pitch</code>, <code>scan.name</code>, <code>scan.num_frames</code>, <code>scan.frame_size</code></td></tr>
-  <tr><td>PtychoModel</td><td>the parameters and the forward model; the <a href="objects.html">objects page</a>, section 2, lists every method</td></tr>
+  <tr><td>PtychoModel</td><td>the parameters and the forward model; the <a href="objects.html">software architecture page</a>, section 2, lists every method</td></tr>
   <tr><td>Sample</td><td>an object and the probe it was seen with; a ground truth or what <code>recon</code> returns: <code>object</code>, <code>probe</code>, <code>pixel_pitch</code>, <code>origin</code>, <code>name</code>, <code>mode_energies</code>, <code>phase</code>, <code>magnitude</code>, and <code>run</code> for a reconstruction (<code>run.parameters</code>, <code>run.data_error</code>, <code>run.iterations</code>, <code>run.probe_positions</code>, <code>run.coverage</code>); <code>scanned_region()</code>, the rectangle spanned by the probe centers, for a reconstruction; <code>summary()</code>, <code>save(path)</code>, <code>Sample.load(path)</code></td></tr>
   <tr><td>RunRecord</td><td>the class of <code>run</code>, the record of a reconstruction</td></tr>
   <tr><td>view_scan(scan), view_sample(sample, region, compare_to, compare_label)</td><td>viewing, separate from the objects: each makes figures, puts them on the screen, and returns them. <code>region</code> is the part of the object to show, chosen in the script; with none given, the rectangle spanned by the probe centers. The windows zoom and pan with the mouse.</td></tr>
   <tr><td>save_figures(figures, directory)</td><td>write the figures a view returned to PNG files</td></tr>
   <tr><td>download(url, directory)</td><td>download a file into a directory unless it is already there; returns the local path</td></tr>
   <tr><td>scan_positions(grid, step, max_offset, seed)</td><td>positions of a rectangular scan with random offsets, in meters</td></tr>
-  <tr><td>preprocess</td><td>the module of preprocessing steps, each a function of arrays in memory: <code>cxi.load_raw(path)</code>, <code>subtract_dark</code>, <code>find_outlier_frames</code>, <code>diffraction_center</code>, <code>crop_frames</code>, <code>tukey_window</code>; see the <a href="preprocessing.html">preprocessing page</a></td></tr>
+  <tr><td>preprocess</td><td>the module of preprocessing steps, each a function of arrays in memory: <code>cxi.load_raw(path)</code>, <code>subtract_dark</code>, <code>find_outlier_frames</code>, <code>diffraction_center</code>, <code>crop_frames</code>, <code>tukey_window</code>; see the <a href="preprocessing.html">pre and post processing page</a></td></tr>
   <tr><td>nrmse(image, truth, region=None)</td><td>error after removing one complex scale; with a region (for example <code>recon.scanned_region()</code>) only the pixels inside it count</td></tr>
   <tr><td>match_scale(image, truth, region=None)</td><td><code>image</code> times the one complex number that brings it closest to <code>truth</code></td></tr>
   <tr><td>energy_to_wavelength(energy)</td><td>photon energy in keV to wavelength in meters</td></tr>
@@ -175,7 +175,7 @@ print(model.data_error(scan, recon.object, recon.probe))</pre>
   <tr><td>probe_fresnel_radius_pixels</td><td><span class="kind k-par">reconstruction</span></td><td>The radius, in pixels, over which Fresnel propagation spreads each point of the initial probe and of a new mode; default 0 (no propagation)</td></tr>
   <tr><td>object_shape</td><td><span class="kind k-par">reconstruction</span></td><td>rows and columns of the object grid; default: the smallest grid that holds every patch</td></tr>
   <tr><td>object_origin</td><td><span class="kind k-par">reconstruction</span></td><td>meters, the position of the center of the first pixel of the object grid; default: from the positions</td></tr>
-  <tr><td>num_devices, devices</td><td><span class="kind k-comp">device</span></td><td>arguments of <code>configure_devices</code>: how many GPUs, or which; see <a href="computing.html">Computing</a>, section 4</td></tr>
+  <tr><td>num_devices, devices</td><td><span class="kind k-comp">device</span></td><td>arguments of <code>configure_devices</code>: how many GPUs, or which; see <a href="computing.html">Hardware Mapping</a>, section 4</td></tr>
   <tr><td>batch_size</td><td><span class="kind k-comp">device</span></td><td>positions processed together on a device; set with <code>set_params</code>; default: from the free memory</td></tr>
 </table>
 </div>

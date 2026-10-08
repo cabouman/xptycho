@@ -14,12 +14,12 @@ xptycho was designed before it was written.  The design is a set of web pages ke
 
    * - Page
      - What it settles
-   * - Theory
+   * - Algorithm
      - The PMACE algorithm as it is run, organized by the kinds of quantities it uses.
-   * - Objects and data
+   * - Software Architecture
      - The three objects, what each holds, and every method.
-   * - Computing
+   * - Hardware Mapping
      - How a reconstruction is divided among the GPUs of a node, and the measured agreement
        with the reference code.
-   * - The user's view
+   * - User API
      - The scripts a user writes, and every public name.

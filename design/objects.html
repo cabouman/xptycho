@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>xptycho Objects and Data</title>
+<title>xptycho Software Architecture</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap">
 <style>
-/* Layout: one reading column. The model is drawn once as a box with its three parameter groups and its methods; the two directions through it (simulation, reconstruction) are drawn as flows. Colors match the theory page. */
+/* Layout: one reading column. The model is drawn once as a box with its three parameter groups and its methods; the two directions through it (simulation, reconstruction) are drawn as flows. Colors match the algorithm page. */
 :root {
   --bg: #fbfaf7; --surface: #ffffff; --fg: #1f2328; --muted: #5f6670; --line: #d9d7d0;
   --data: #b7791f;   --data-bg: #fdf3df;
@@ -106,9 +106,9 @@ table.where th { font-size: 12px; letter-spacing: 0.06em; text-transform: upperc
 </head>
 <body>
 <div class="wrap">
-<p class="crumb"><a href="index.html">xptycho design</a> &rsaquo; Objects and data</p>
-<h1>Objects and Data</h1>
-<p class="lead">How the five kinds of quantities from the <a href="theory.html">theory page</a> map onto objects. The layout is the mbirtorch pattern: one model holds the parameters and the forward model, and the unknowns pass through it as arguments and results. The unknowns are held in a <code>Sample</code>: an object and the probe it was seen with. A ground truth and a reconstruction are both a <code>Sample</code>; <code>simulate</code> takes one and <code>recon</code> returns one. Position refinement is a method the user calls (section 7).</p>
+<p class="crumb"><a href="index.html">xptycho design</a> &rsaquo; Software Architecture</p>
+<h1>Software Architecture</h1>
+<p class="lead">How the five kinds of quantities from the <a href="theory.html">algorithm page</a> map onto objects. The layout is the mbirtorch pattern: one model holds the parameters and the forward model, and the unknowns pass through it as arguments and results. The unknowns are held in a <code>Sample</code>: an object and the probe it was seen with. A ground truth and a reconstruction are both a <code>Sample</code>; <code>simulate</code> takes one and <code>recon</code> returns one. Position refinement is a method the user calls (section 7).</p>
 
 <h2>1. The three things a user holds</h2>
 <div class="three">
@@ -160,7 +160,7 @@ table.where th { font-size: 12px; letter-spacing: 0.06em; text-transform: upperc
     </div>
     <div class="group g-par">
       <h4>Reconstruction parameters</h4>
-      <div class="how"><code>set_params(...)</code> and <code>get_params(...)</code>, by name. The defaults are in the <a href="theory.html">theory page</a>, section 7.</div>
+      <div class="how"><code>set_params(...)</code> and <code>get_params(...)</code>, by name. The defaults are in the <a href="theory.html">algorithm page</a>, section 7.</div>
       <ul>
         <li><code>object_data_fit</code> \(\alpha_1\), <code>probe_data_fit</code> \(\alpha_2\)</li>
         <li><code>probe_weight_exponent</code> \(\kappa\), <code>relaxation</code> \(\rho\)</li>
@@ -187,14 +187,14 @@ table.where th { font-size: 12px; letter-spacing: 0.06em; text-transform: upperc
       <div class="meth"><code>PtychoModel(…) <em>constructor</em></code><span>Build from the forward-model parameters.</span></div>
       <div class="meth"><code>PtychoModel.from_scan(scan, num_probe_modes=1, **overrides) <em>classmethod</em></code><span>Build from the facts a scan file recorded. Any parameter passed overrides the file's value.</span></div>
       <div class="meth"><code>model.set_params(**p), model.get_params(names)</code><span>Set and read the reconstruction parameters by name, <code>batch_size</code> among them, as in mbirtorch. <code>set_params</code> also takes <code>probe_positions</code>, to replace the positions (section 7). <code>get_params</code> also reads the forward-model parameters and <code>sample_pixel_pitch</code>.</span></div>
-      <div class="meth"><code>model.configure_devices(num_devices=1, devices=None)</code><span>Choose the devices, as in mbirtorch: a count of GPUs, or an explicit list. Without a call the model chooses automatically. See <a href="computing.html">Computing</a>, section 4.</span></div>
+      <div class="meth"><code>model.configure_devices(num_devices=1, devices=None)</code><span>Choose the devices, as in mbirtorch: a count of GPUs, or an explicit list. Without a call the model chooses automatically. See <a href="computing.html">Hardware Mapping</a>, section 4.</span></div>
       <div class="meth"><code>model.print_params()</code><span>Print every parameter with its value, units, and origin (given, file, derived, default).</span></div>
       <div class="meth"><code>model.forward(x, d)</code><span><b>The forward model.</b> For every scan position: cut the patch out of <code>x</code>, multiply by each probe mode, far-field transform, sum the modes in intensity. Returns the noiseless amplitudes \(y_j\), shape \((J, N_p, N_p)\). Stores nothing.</span></div>
       <div class="meth"><code>model.simulate(sample, peak_photons=None, dark_rate=0, seed=0)</code><span>Calls <code>forward</code> on the sample's object and probe, after checking that the sample's <code>pixel_pitch</code> equals the model's, scales the intensities so the brightest detector pixel is <code>peak_photons</code>, draws Poisson counts, and returns a <code>Scan</code> carrying this model's positions and instrument facts. Without <code>peak_photons</code>, the exact intensities.</span></div>
-      <div class="meth"><code>model.recon(scan, probe=None, init_probe=None, init=None, iterations=100, verbose=1)</code><span><b>The reconstruction.</b> With <code>probe=</code>, the probe is known and held fixed. Without it, the probe is estimated: from <code>init_probe=</code> when given, else from the data-driven initialization. A given <code>probe=</code> must have all \(K\) modes. An estimate may start with fewer: one mode from the initialization, or however many <code>init_probe=</code> has, and reaches \(K\) by adding a mode at each iteration of <code>mode_schedule</code> (theory page, section 5). The schedule must have enough entries to reach \(K\), or <code>recon</code> refuses before it starts. <code>init=</code> warm-starts from a <code>Sample</code>, usually a previous result: its object, and its probe when the probe is estimated and <code>init_probe=</code> is not given. <code>iterations</code> is the one setting that changes on every call, so it is an argument here, as mbirtorch's <code>max_iterations</code> is. <code>verbose=1</code> prints one line per iteration; 0 prints nothing. Returns a <code>Sample</code> with its <code>run</code> record. The run state lives only inside this call.</span></div>
+      <div class="meth"><code>model.recon(scan, probe=None, init_probe=None, init=None, iterations=100, verbose=1)</code><span><b>The reconstruction.</b> With <code>probe=</code>, the probe is known and held fixed. Without it, the probe is estimated: from <code>init_probe=</code> when given, else from the data-driven initialization. A given <code>probe=</code> must have all \(K\) modes. An estimate may start with fewer: one mode from the initialization, or however many <code>init_probe=</code> has, and reaches \(K\) by adding a mode at each iteration of <code>mode_schedule</code> (algorithm page, section 5). The schedule must have enough entries to reach \(K\), or <code>recon</code> refuses before it starts. <code>init=</code> warm-starts from a <code>Sample</code>, usually a previous result: its object, and its probe when the probe is estimated and <code>init_probe=</code> is not given. <code>iterations</code> is the one setting that changes on every call, so it is an argument here, as mbirtorch's <code>max_iterations</code> is. <code>verbose=1</code> prints one line per iteration; 0 prints nothing. Returns a <code>Sample</code> with its <code>run</code> record. The run state lives only inside this call.</span></div>
       <div class="meth"><code>model.data_error(scan, x, d)</code><span>The normalized distance between <code>forward(x, d)</code> and the scan's amplitudes. The curve <code>recon</code> reports, available on its own.</span></div>
       <div class="meth"><code>model.refine_probe_positions(scan, x, d, max_shift=1)</code><span>One refinement pass: for each position, the integer shift within <code>max_shift</code> whose <code>forward</code> best matches the data, given <code>x</code> and <code>d</code>. Returns the refined positions and the per-position misfit. Changes nothing. Section 7.</span></div>
-      <div class="meth"><code>model.initial_probe(scan), model.initial_object(scan, d)</code><span>The two initialization formulas of the theory page, exposed so a user can look at the starting point. <code>recon</code> calls them when nothing is given.</span></div>
+      <div class="meth"><code>model.initial_probe(scan), model.initial_object(scan, d)</code><span>The two initialization formulas of the algorithm page, exposed so a user can look at the starting point. <code>recon</code> calls them when nothing is given.</span></div>
     </div>
     </div>
   </div>

@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>xptycho Preprocessing</title>
+<title>xptycho Pre and Post Processing</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap">
 <style>
-/* Layout: one reading column; the scripts a user writes, one per use, then every public name in one table. Colors match the theory page. */
+/* Layout: one reading column; the scripts a user writes, one per use, then every public name in one table. Colors match the algorithm page. */
 :root {
   --bg: #fbfaf7; --surface: #ffffff; --fg: #1f2328; --muted: #5f6670; --line: #d9d7d0;
   --data: #b7791f; --fm: #0b7285; --unk: #2b6cb0; --par: #2f855a; --state: #6b46c1; --comp: #718096; --accent: #2b6cb0;
@@ -47,8 +47,8 @@ table.t td:first-child { font-family: var(--mono); font-size: 13px; white-space:
 </head>
 <body>
 <div class="wrap">
-<p class="crumb"><a href="index.html">xptycho design</a> &rsaquo; Preprocessing</p>
-<h1>Preprocessing</h1>
+<p class="crumb"><a href="index.html">xptycho design</a> &rsaquo; Pre and Post Processing</p>
+<h1>Pre and Post Processing</h1>
 <p class="lead">How raw detector frames become a <code>Scan</code>. The steps are those Qiuchen Zhai used for the gold-ball data in the two TCI papers, read from her script in <code>ptycho_pmace_papers</code>. Each step is a function of arrays in memory; one reader per file format does the file reading. Section 4 lists what was checked against her data, and section 5 gives notes on the design.</p>
 
 <h2>1. The goal</h2>

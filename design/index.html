@@ -48,27 +48,27 @@ ul.refs li { margin: 4px 0; }
 
 <div class="list">
   <div class="item">
-    <h3><a href="theory.html">1. Theory</a></h3>
+    <h3><a href="theory.html">1. Algorithm</a></h3>
     <span class="status done">written</span>
     <p>The PMACE algorithm of the two TCI papers, as xptycho runs it, organized by the five kinds of quantities it uses (measured data, forward-model parameters, unknowns, reconstruction parameters, run state); the forward model and the operators; one iteration with each step marked local or global; initialization; adding probe modes; the facts that matter for code; and the parameter names.</p>
   </div>
   <div class="item">
-    <h3><a href="objects.html">2. Objects and data</a></h3>
+    <h3><a href="objects.html">2. Software Architecture</a></h3>
     <span class="status done">written</span>
     <p>The mbirtorch pattern: a <code>Scan</code> holds the data, a <code>PtychoModel</code> holds the forward-model parameters, the reconstruction parameters, and the device settings and computes <code>forward</code>, <code>simulate</code>, and <code>recon</code>; a <code>Sample</code> holds the unknowns, an object and its probe, whether true or estimated. The model drawn in full with every method, the <code>Sample</code> and the record of its run, the HDF5 file format, the two directions through the model, the scripts, and position refinement as a method.</p>
   </div>
   <div class="item">
-    <h3><a href="computing.html">3. Computing</a></h3>
+    <h3><a href="computing.html">3. Hardware Mapping</a></h3>
     <span class="status done">written</span>
     <p>The design for carrying out the iteration on \(N_g\) GPUs of one node, all data in GPU memory, fully sharded as in mbirtorch: per-position arrays by position, the object image by row into bands with owners, small arrays broadcast. What each GPU holds and how large a scan fits; what each GPU computes and what moves between GPUs in every step; what crosses between host and GPU; how the user chooses the GPUs.</p>
   </div>
   <div class="item">
-    <h3><a href="users-view.html">4. The user's view</a></h3>
+    <h3><a href="users-view.html">4. User API</a></h3>
     <span class="status done">written</span>
     <p>The scripts a user writes, one per use: the three demos, several GPUs, continuing and refining, the forward model alone. Every public name and every parameter by kind in one place.</p>
   </div>
   <div class="item">
-    <h3><a href="preprocessing.html">5. Preprocessing</a></h3>
+    <h3><a href="preprocessing.html">5. Pre and Post Processing</a></h3>
     <span class="status done">written</span>
     <p>How raw detector frames become a <code>Scan</code>: dark subtraction, removal of outlier frames, one center for the whole scan, cropping, and a window, each a function of arrays in memory, with one reader per file format. Checked against the preprocessed gold-ball frames of the reference code.</p>
   </div>
