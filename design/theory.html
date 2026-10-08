@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>xptycho Algorithm</title>
+<title>xptycho Algorithm Blueprint</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap">
 <script>
 window.MathJax = { tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] }, svg: { fontCache: 'global' } };
@@ -80,8 +80,8 @@ table.params th { font-size: 12px; letter-spacing: 0.06em; text-transform: upper
 <body>
 
 <div class="wrap">
-<p class="crumb"><a href="index.html">xptycho design</a> &rsaquo; Algorithm</p>
-<h1>Algorithm</h1>
+<p class="crumb"><a href="index.html">xptycho blueprints</a> &rsaquo; Algorithm</p>
+<h1>Algorithm Blueprint</h1>
 <p class="lead">The PMACE algorithm as xptycho runs it (<code>xptycho/pmace.py</code> and <code>xptycho/model.py</code>), organized by the kinds of quantities it uses. The derivation is in the two TCI papers (2023, known probe; 2025, blind multi-mode). The method was first implemented in Qiuchen Zhai's research code <code>ptycho_pmace</code>, which fills in details the papers leave out; xptycho does the same, and this page says where it differs from the papers. The 2023 case is \(K=1\) with the probe held fixed, so this is one algorithm.</p>
 
 <h2>1. The quantities</h2>
@@ -134,7 +134,7 @@ table.params th { font-size: 12px; letter-spacing: 0.06em; text-transform: upper
     <ul>
       <li>\(\mathbf{v} = [v_0,\dots,v_{J-1}]\): one complex \(N_p \times N_p\) patch per scan position, each position's own copy of its part of the object. The same size as the data.</li>
       <li>When the probe is estimated: \(\mathbf{s}_k = [d_{0,k},\dots,d_{J-1,k}]\), each position's own copy of mode \(k\). Also the size of the data, once per mode.</li>
-      <li>The other Mann variables: \(\mathbf{w}, \mathbf{z}\) (patches) and \(\mathbf{r}_k, \mathbf{u}_k\) (probes). They are temporary. xptycho never stores \(\mathbf{w}\), \(\mathbf{z}\), or \(\mathbf{r}_k\) for all positions at once: each is formed for one batch of positions and used at once (<a href="computing.html">hardware mapping page</a>, section 2).</li>
+      <li>The other Mann variables: \(\mathbf{w}, \mathbf{z}\) (patches) and \(\mathbf{r}_k, \mathbf{u}_k\) (probes). They are temporary. xptycho never stores \(\mathbf{w}\), \(\mathbf{z}\), or \(\mathbf{r}_k\) for all positions at once: each is formed for one batch of positions and used at once (<a href="computing.html">hardware mapping blueprint</a>, section 2).</li>
     </ul>
     <p style="margin:8px 0 0;font-size:14px">PMACE is a consensus method: every scan position holds its own copy of what it can see, and the unknowns are the consensus of the copies. Neither unknown is state. At the end, \(\hat x\) is the weighted average of the \(v_j\) and \(\hat d_k\) is the mean of the \(d_{j,k}\). Inside the loop the steps use consensus values. The object step uses \(\mathbf{z}\) (patches of the average of \(2\mathbf{w}-\mathbf{v}\)) and the modes \(d_k\). The probe step uses the patches \(p_j = P_j \bar x\) of the reported image and the modes \(d_k\). The modes \(d_k\) are the mean of the copies \(\mathbf{s}_k\) after their Mann update.</p>
   </div>
@@ -229,7 +229,7 @@ table.params th { font-size: 12px; letter-spacing: 0.06em; text-transform: upper
 <h2>6. The facts that matter for code</h2>
 <ol class="facts">
   <li><b>Every pass is local, global, local.</b> The local steps need only their own \(y_j\), their own state row, and the current consensus. The global step is one sum over \(j\). This is what lets the data stream through in batches and across GPUs without changing the answer, provided the order within an iteration (the image pass, the averaging, then the probe pass) is kept.</li>
-  <li><b>The state is as large as the data, times \((1+K)\).</b> xptycho stores \(\mathbf{v}\) and, when the probe is estimated, \(\mathbf{s}_k\) for every position. It does not store \(\mathbf{w}\), \(\mathbf{z}\), or \(\mathbf{r}_k\) for all positions: each is formed for one batch of positions and used at once. Where the per-position state is kept, and how large a scan fits, is the subject of the <a href="computing.html">hardware mapping page</a>.</li>
+  <li><b>The state is as large as the data, times \((1+K)\).</b> xptycho stores \(\mathbf{v}\) and, when the probe is estimated, \(\mathbf{s}_k\) for every position. It does not store \(\mathbf{w}\), \(\mathbf{z}\), or \(\mathbf{r}_k\) for all positions: each is formed for one batch of positions and used at once. Where the per-position state is kept, and how large a scan fits, is the subject of the <a href="computing.html">hardware mapping blueprint</a>.</li>
   <li><b>The averaging step is scatter-add, divide by coverage, gather.</b> Nothing else touches the whole image. \(\Lambda_k\) is itself a scatter-add of \(|d_k|^\kappa\), recomputed every iteration in a blind run. The iteration does this averaging twice: once on \(2\mathbf{w}-\mathbf{v}\) for the Mann step, once on the updated \(\mathbf{v}\) for the reported image and the probe step.</li>
   <li><b>The probe pass has four global reductions, each over all modes at once:</b> the \(\varepsilon\) of the division by the patches, the mean of \(2\mathbf{r}_k - \mathbf{s}_k\), the mean of the updated copies, and the per-pixel deviation statistic for outlier replacement, which needs the mean first. Mode addition has two: the \(\varepsilon\) of the division by the patches and the mean of the back-transformed residuals.</li>
   <li><b>The forward model is fixed by the forward-model parameters and the object grid.</b> \(P_j\) comes from the positions, the pixel pitch, and the object grid (<code>object_shape</code>, <code>object_origin</code>); \(\mathcal{F}\) is the far-field assumption. The unknowns \(x\) and \(d_k\) are its inputs. Everything else in the algorithm is arithmetic on patches.</li>

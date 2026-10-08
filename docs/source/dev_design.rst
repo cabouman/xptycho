@@ -4,7 +4,7 @@
 Design
 ======
 
-xptycho was designed before it was written.  The design is a set of web pages kept in the
+xptycho was designed before it was written.  The design is a set of blueprints, one web page per component, kept in the
 ``design`` folder of the repository and published at
 `cabouman.github.io/xptycho <https://cabouman.github.io/xptycho/>`__.
 

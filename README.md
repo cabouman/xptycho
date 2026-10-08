@@ -14,7 +14,7 @@ Features include:
 
 Full documentation at [https://xptycho.readthedocs.io/](https://xptycho.readthedocs.io/)
 
-Design pages at [https://cabouman.github.io/xptycho/](https://cabouman.github.io/xptycho/)
+Blueprints at [https://cabouman.github.io/xptycho/](https://cabouman.github.io/xptycho/)
 
 Install:
 ```bash

@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>xptycho Hardware Mapping</title>
+<title>xptycho Hardware Mapping Blueprint</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap">
 <style>
-/* Layout: one reading column. A goal box, then one section per question, each opening with its goal and answering it with a table or a figure. Colors match the algorithm page. */
+/* Layout: one reading column. A goal box, then one section per question, each opening with its goal and answering it with a table or a figure. Colors match the algorithm blueprint. */
 :root {
   --bg: #fbfaf7; --surface: #ffffff; --fg: #1f2328; --muted: #5f6670; --line: #d9d7d0;
   --data: #b7791f;   --data-bg: #fdf3df;
@@ -65,12 +65,12 @@ li { margin: 4px 0; }
 </head>
 <body>
 <div class="wrap">
-<p class="crumb"><a href="index.html">xptycho design</a> &rsaquo; Hardware Mapping</p>
-<h1>Hardware Mapping</h1>
+<p class="crumb"><a href="index.html">xptycho blueprints</a> &rsaquo; Hardware Mapping</p>
+<h1>Hardware Mapping Blueprint</h1>
 
 <div class="goal">
   <b class="g">Goal of this page</b>
-  <p>The design for carrying out the <a href="theory.html">algorithm page</a>'s iteration on \(N_g\) GPUs of a single node, with all the data held in GPU memory. One GPU is the case \(N_g = 1\) of the same design. It is for the person writing or reviewing <code>recon</code>. It answers five questions:</p>
+  <p>The design for carrying out the <a href="theory.html">algorithm blueprint</a>'s iteration on \(N_g\) GPUs of a single node, with all the data held in GPU memory. One GPU is the case \(N_g = 1\) of the same design. It is for the person writing or reviewing <code>recon</code>. It answers five questions:</p>
   <ol>
     <li>What does each GPU hold, and how large a scan fits?</li>
     <li>What does each GPU compute, what moves between GPUs, and is the result the same as with one GPU?</li>
@@ -145,7 +145,7 @@ li { margin: 4px 0; }
 <div class="frame">
 <table class="t">
   <tr><th>step</th><th>each GPU, over its own positions</th><th>summed to owner</th><th>the owner computes, and windows copy</th></tr>
-  <tr><td>0. start<br>(once)</td><td>\(v_j = P_j x^{(0)}\), cut from its window; \(s_{j,k} = d^{(0)}_k\); add \(|d_k|^\kappa\) at each position into an image sum per mode</td><td>\(K\) image sums</td><td>\(\Lambda_k\). The starting probe \(d^{(0)}\) and object \(x^{(0)}\) of the algorithm page, section 4, are computed on the host before the run and sent once (section 3).</td></tr>
+  <tr><td>0. start<br>(once)</td><td>\(v_j = P_j x^{(0)}\), cut from its window; \(s_{j,k} = d^{(0)}_k\); add \(|d_k|^\kappa\) at each position into an image sum per mode</td><td>\(K\) image sums</td><td>\(\Lambda_k\). The starting probe \(d^{(0)}\) and object \(x^{(0)}\) of the algorithm blueprint, section 4, are computed on the host before the run and sent once (section 3).</td></tr>
   <tr class="sep"><td>1. fit patches</td><td>\(w_j = F^I_j(v_j)\); add \(|d_k|^\kappa(2w_j - v_j)\) into an image sum per mode; \(v_j \leftarrow v_j - 2\rho w_j\)</td><td>\(K\) image sums</td><td>the average image of \(2\mathbf{w}-\mathbf{v}\)</td></tr>
   <tr><td>2. update patches</td><td>\(v_j \leftarrow v_j + 2\rho z_j\), \(z_j\) the patch of that image; add \(|d_k|^\kappa v_j\) into an image sum per mode</td><td>\(K\) image sums</td><td>\(\bar x\), the reported image</td></tr>
   <tr class="sep"><td>3. add a mode<br>(scheduled iterations)</td><td>the residual, back-transformed and divided by the patch of \(\bar x\); add into a sum</td><td>one probe-sized sum</td><td>the new mode and the rescale factor; each GPU then makes its own copies and rescales its own arrays</td></tr>
@@ -155,7 +155,7 @@ li { margin: 4px 0; }
   <tr class="sep"><td>7. data error<br>(for the progress line)</td><td>forward-project the patches of \(\bar x\) with \(d_k\); add the squared difference from \(y_j\), and \(y_j^2\)</td><td>two numbers</td><td>the data error</td></tr>
 </table>
 </div>
-<p>The algorithm page's update \(v + 2\rho(z - w)\) is done in place in two parts, \(-2\rho w\) in step 1 and \(+2\rho z\) in step 2, so \(w\) is never stored; likewise for the probe copies. Steps 3 to 6 run only when the probe is estimated. With a known probe, \(\Lambda_k\) is computed once in step 0. Within a GPU, a step processes its block in batches (about 1,000 positions at \(N_p = 256\) with 9 GB free) so that the temporary arrays of the Fourier transforms fit.</p>
+<p>The algorithm blueprint's update \(v + 2\rho(z - w)\) is done in place in two parts, \(-2\rho w\) in step 1 and \(+2\rho z\) in step 2, so \(w\) is never stored; likewise for the probe copies. Steps 3 to 6 run only when the probe is estimated. With a known probe, \(\Lambda_k\) is computed once in step 0. Within a GPU, a step processes its block in batches (about 1,000 positions at \(N_p = 256\) with 9 GB free) so that the temporary arrays of the Fourier transforms fit.</p>
 
 <p><b>Numbers that depend on all the positions or on the whole image.</b> Each is formed from sums over all the GPUs. Computing one per GPU or per batch gives a different result (an error near \(10^{-3}\) in a small test).</p>
 <div class="frame">
